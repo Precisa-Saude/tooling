@@ -1,7 +1,7 @@
 {
   "name": "@precisa-saude/eslint-config",
   "version": "1.0.1",
-  "description": "Shared flat ESLint 9 config for Precisa Saúde repositories.",
+  "description": "Shared flat ESLint config (9+/10) for Precisa Saúde repositories.",
   "keywords": [
     "eslint",
     "eslint-config",
@@ -45,7 +45,7 @@
     "globals": "^15.15.0"
   },
   "peerDependencies": {
-    "eslint": "^9.0.0",
+    "eslint": "^9.0.0 || ^10.0.0",
     "prettier": "^3.0.0"
   },
   "engines": {
