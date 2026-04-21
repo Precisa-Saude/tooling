@@ -118,3 +118,8 @@ templates:
     target: .github/workflows/release.yml
     required_when: publishes_to_npm
     merge_strategy: overwrite
+
+  - source: github/workflows/review.yml
+    target: .github/workflows/review.yml
+    required_when: always
+    merge_strategy: overwrite
