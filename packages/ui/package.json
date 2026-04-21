@@ -1,0 +1,67 @@
+{
+  "name": "@precisa-saude/ui",
+  "version": "0.0.0",
+  "description": "Shared React components and hooks for Precisa Saúde sites and apps.",
+  "keywords": [
+    "react",
+    "components",
+    "hooks",
+    "base-ui",
+    "tailwind",
+    "precisa-saude"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Precisa-Saude/tooling.git",
+    "directory": "packages/ui"
+  },
+  "license": "Apache-2.0",
+  "author": "Precisa Saúde",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./hooks": {
+      "types": "./dist/hooks/index.d.ts",
+      "import": "./dist/hooks/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils/index.d.ts",
+      "import": "./dist/utils/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "clean": "rm -rf dist .turbo",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.5.4"
+  },
+  "devDependencies": {
+    "@precisa-saude/tsconfig": "workspace:*",
+    "@types/react": "^19.0.14",
+    "@types/react-dom": "^19.0.6",
+    "react": "^19.0.3",
+    "react-dom": "^19.0.3",
+    "tsup": "^8.3.5",
+    "typescript": "~5.7.3"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

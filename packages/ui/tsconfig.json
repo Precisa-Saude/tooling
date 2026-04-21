@@ -1,0 +1,12 @@
+{
+  "extends": "@precisa-saude/tsconfig/react",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "types": ["react"]
+  },
+  "include": ["src"]
+}
