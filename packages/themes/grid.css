@@ -1,0 +1,29 @@
+/**
+ * Responsive column grid.
+ *
+ * - 14 columns below the breakpoint; 16 columns at ≥1440px.
+ * - Max content width of 1440px above the breakpoint; fluid below.
+ * - Exposes --col-w for aligning non-grid elements to column widths.
+ *
+ * Use with Tailwind's arbitrary-grid utilities:
+ *   <div class="grid grid-cols-[repeat(var(--grid-cols),1fr)] gap-4">
+ *
+ * Or attach custom columns:
+ *   <div style={{ gridColumn: 'span 6 / span 6' }}>
+ */
+
+@layer base {
+  :root {
+    --grid-cols: 14;
+    --grid-gaps: calc(var(--grid-cols) - 1);
+    --grid-max-w: calc(var(--grid-cols) * 6rem - 1rem);
+    --col-w: calc((min(100vw, var(--grid-max-w)) - var(--grid-gaps) * 1rem) / var(--grid-cols));
+  }
+
+  @media (min-width: 1440px) {
+    :root {
+      --grid-cols: 16;
+      --grid-max-w: 1440px;
+    }
+  }
+}
