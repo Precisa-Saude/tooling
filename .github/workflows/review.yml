@@ -1,0 +1,260 @@
+name: Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check-review-status:
+    name: Check review status
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      pull-requests: read
+      issues: read
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+      review_round: ${{ steps.check.outputs.review_round }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Decide whether to run
+        id: check
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.issue.number;
+
+            // Skip docs/config-only PRs
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              per_page: 100,
+            });
+            const ignore = [/\.md$/, /^docs\//, /^\.github\//, /\.json$/, /\.ya?ml$/, /\.cff$/];
+            const hasCode = files.some(f => !ignore.some(p => p.test(f.filename)));
+            if (!hasCode) {
+              core.setOutput('should_run', 'false');
+              core.setOutput('review_round', 'skip');
+              return;
+            }
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              per_page: 100,
+            });
+            const round1 = comments.some(c => c.body?.includes('<!-- CLAUDE_REVIEW_ROUND_1 -->'));
+            const round2 = comments.some(c => c.body?.includes('<!-- CLAUDE_REVIEW_ROUND_2_COMPLETE -->'));
+
+            if (round2) {
+              core.setOutput('should_run', 'false');
+              core.setOutput('review_round', 'complete');
+              return;
+            }
+            core.setOutput('should_run', 'true');
+            core.setOutput('review_round', round1 ? '2' : '1');
+
+  claude-review:
+    name: Claude review
+    needs: check-review-status
+    if: needs.check-review-status.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      CLAUDE_MODEL: claude-haiku-4-5-20251001
+      MAX_DIFF_SIZE: '150000'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build review input
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_ROUND: ${{ needs.check-review-status.outputs.review_round }}
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          HEAD_SHA=$(gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid)
+          echo "head_sha=$HEAD_SHA" >> $GITHUB_OUTPUT
+          echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
+
+          if [ "$REVIEW_ROUND" = "2" ]; then
+            FIRST=$(gh pr view "$PR_NUMBER" --json commits -q '.commits[0].oid')
+            git diff "$FIRST"..HEAD > pr.diff
+          else
+            gh pr diff "$PR_NUMBER" > pr.diff
+          fi
+
+          gh pr view "$PR_NUMBER" --json files -q '.files[].path' > changed_files.txt
+
+          DIFF_SIZE=$(wc -c < pr.diff)
+          if [ "$DIFF_SIZE" -gt "$MAX_DIFF_SIZE" ]; then
+            head -c "$MAX_DIFF_SIZE" pr.diff > pr.diff.tmp && mv pr.diff.tmp pr.diff
+            echo "diff_truncated=true" >> $GITHUB_OUTPUT
+          else
+            echo "diff_truncated=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Call Anthropic API
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DIFF_TRUNCATED: ${{ steps.pr.outputs.diff_truncated }}
+          REVIEW_ROUND: ${{ needs.check-review-status.outputs.review_round }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::ANTHROPIC_API_KEY repository secret is not configured. Skipping review."
+            echo '{"summary":"Skipped — secret missing","changes":[],"feedback":[]}' > review.json
+            echo '{}' > review-usage.json
+            exit 0
+          fi
+
+          node << 'SCRIPT'
+          const fs = require('fs');
+          const diff = fs.readFileSync('pr.diff', 'utf8');
+          const files = fs.readFileSync('changed_files.txt', 'utf8').trim();
+          const round = process.env.REVIEW_ROUND;
+          const truncated = process.env.DIFF_TRUNCATED === 'true';
+
+          const system = [
+            'You are a senior software engineer performing a code review.',
+            'Analyze the PR diff carefully and provide actionable, specific feedback.',
+            'Focus on bugs, security issues, performance problems, and significant code-quality concerns.',
+            'Do not include nitpicks, style preferences, or suggestions to add comments.',
+          ].join(' ');
+
+          const user = [
+            `Review Round: ${round}`,
+            '',
+            '## Files changed in this PR',
+            'These are the ONLY files modified. Do NOT reference any other files in feedback:',
+            files,
+            '',
+            truncated ? '> **Note**: Diff truncated due to size. Review only what is shown below.\n' : '',
+            '## Diff',
+            '',
+            '```diff',
+            diff,
+            '```',
+            '',
+            'Respond with ONLY a valid JSON object (no markdown fences). Use this exact structure:',
+            '{"summary": "...", "changes": ["..."], "feedback": [{"file": "path", "line": 42, "comment": "..."}]}',
+            '',
+            'Rules:',
+            '- The "file" field MUST be one of the files listed above.',
+            '- The "line" field MUST reference a line number from the NEW version (right side of diff, + lines). Cross-check against @@ hunk headers.',
+            '- Include feedback only for real issues; skip nits.',
+            '- Do NOT hallucinate code not visible in the diff.',
+            '- If no issues, return an empty feedback array.',
+          ].join('\n');
+
+          const request = {
+            model: process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001',
+            max_tokens: 8192,
+            system,
+            messages: [{ role: 'user', content: user }],
+          };
+          fs.writeFileSync('/tmp/request.json', JSON.stringify(request));
+          SCRIPT
+
+          HTTP_CODE=$(curl -sS -o /tmp/response.json -w "%{http_code}" \
+            https://api.anthropic.com/v1/messages \
+            -H "content-type: application/json" \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -d @/tmp/request.json)
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Anthropic API returned HTTP $HTTP_CODE"
+            cat /tmp/response.json
+            echo '{"summary":"API error — see workflow logs","changes":[],"feedback":[]}' > review.json
+            echo '{}' > review-usage.json
+            exit 0
+          fi
+
+          node -e "
+            const fs = require('fs');
+            const resp = JSON.parse(fs.readFileSync('/tmp/response.json', 'utf8'));
+            fs.writeFileSync('review.json', resp.content[0].text);
+            fs.writeFileSync('review-usage.json', JSON.stringify(resp.usage || {}));
+          "
+
+      - name: Post review
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const prNumber = ${{ steps.pr.outputs.number }};
+            const headSha = '${{ steps.pr.outputs.head_sha }}';
+            const round = '${{ needs.check-review-status.outputs.review_round }}';
+
+            const raw = fs.readFileSync('review.json', 'utf8').trim();
+            let review;
+            try {
+              let s = raw;
+              if (s.startsWith('```')) s = s.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+              review = JSON.parse(s);
+            } catch (e) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: `## Claude Review (Round ${round})\n\n${raw}\n\n---\n*Automated review*`,
+              });
+              return;
+            }
+
+            const summary = review.summary || 'No summary provided';
+            const changes = (review.changes || []).map(c => `- ${c}`).join('\n') || '_none_';
+            const feedback = review.feedback || [];
+
+            const isRound1 = round === '1';
+            const marker = isRound1 ? '<!-- CLAUDE_REVIEW_ROUND_1 -->' : '<!-- CLAUDE_REVIEW_ROUND_2_COMPLETE -->';
+            const label = isRound1 ? 'Round 1' : 'Round 2 (Final)';
+
+            let body = `## Claude Review — ${label}\n\n${marker}\n\n`;
+            body += `### Summary\n${summary}\n\n`;
+            body += `### Changes\n${changes}\n\n---\n`;
+            body += feedback.length === 0
+              ? `:white_check_mark: No issues found\n\n`
+              : `:mag: Found ${feedback.length} suggestion${feedback.length === 1 ? '' : 's'} (see inline comments)\n\n`;
+            body += isRound1
+              ? `*Automated review — Round 1 of 2*`
+              : `*Automated review — Round 2 (Final); no further reviews will be performed*`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body,
+            });
+
+            for (const item of feedback) {
+              try {
+                await github.rest.pulls.createReviewComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: prNumber,
+                  body: item.comment,
+                  path: item.file,
+                  line: item.line,
+                  commit_id: headSha,
+                  side: 'RIGHT',
+                });
+              } catch (e) {
+                console.log(`Failed to post comment on ${item.file}:${item.line} — ${e.message}`);
+              }
+            }
