@@ -1,3 +1,9 @@
+## [1.0.2](https://github.com/Precisa-Saude/tooling/compare/v1.0.1...v1.0.2) (2026-04-21)
+
+### Bug Fixes
+
+* **eslint:** broaden peer range to accept ESLint 10 ([#11](https://github.com/Precisa-Saude/tooling/issues/11)) ([5f0ca2a](https://github.com/Precisa-Saude/tooling/commit/5f0ca2afba4408f8684222329b9ddb559bd5c26a))
+
 ## [1.0.1](https://github.com/Precisa-Saude/tooling/compare/v1.0.0...v1.0.1) (2026-04-21)
 
 ### Bug Fixes

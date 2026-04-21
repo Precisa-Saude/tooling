@@ -1,6 +1,6 @@
 {
   "name": "@precisa-saude/eslint-config",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Shared flat ESLint config (9+/10) for Precisa Saúde repositories.",
   "keywords": [
     "eslint",
