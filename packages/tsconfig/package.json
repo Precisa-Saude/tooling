@@ -1,0 +1,34 @@
+{
+  "name": "@precisa-saude/tsconfig",
+  "version": "0.0.0",
+  "description": "Shared TypeScript configs for Precisa Saúde repositories.",
+  "keywords": [
+    "typescript",
+    "tsconfig",
+    "precisa-saude"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Precisa-Saude/tooling.git",
+    "directory": "packages/tsconfig"
+  },
+  "license": "Apache-2.0",
+  "author": "Precisa Saúde",
+  "exports": {
+    "./base": "./base.json",
+    "./library": "./library.json",
+    "./react": "./react.json"
+  },
+  "files": [
+    "base.json",
+    "library.json",
+    "react.json",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "typescript": ">=5.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

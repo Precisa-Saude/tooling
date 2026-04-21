@@ -1,0 +1,35 @@
+{
+  "name": "@precisa-saude/commitlint-config",
+  "version": "0.0.0",
+  "description": "Shared commitlint config for Precisa Saúde repositories — conventional commits with per-repo scopes and AI-attribution blocking.",
+  "keywords": [
+    "commitlint",
+    "commitlint-config",
+    "conventional-commits",
+    "precisa-saude"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Precisa-Saude/tooling.git",
+    "directory": "packages/commitlint-config"
+  },
+  "license": "Apache-2.0",
+  "author": "Precisa Saúde",
+  "exports": {
+    ".": "./index.cjs"
+  },
+  "main": "./index.cjs",
+  "files": [
+    "index.cjs",
+    "README.md"
+  ],
+  "dependencies": {
+    "@commitlint/config-conventional": "^20.5.0"
+  },
+  "peerDependencies": {
+    "@commitlint/cli": ">=19"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
