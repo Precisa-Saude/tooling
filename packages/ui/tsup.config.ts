@@ -7,6 +7,8 @@ export default defineConfig({
     'decorative/index': 'src/decorative/index.ts',
     'hooks/index': 'src/hooks/index.ts',
     index: 'src/index.ts',
+    'layout/index': 'src/layout/index.ts',
+    'marketing/index': 'src/marketing/index.ts',
     'primitives/index': 'src/primitives/index.ts',
     'utils/index': 'src/utils/index.ts',
   },

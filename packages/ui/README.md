@@ -28,8 +28,14 @@ Built on [Base UI](https://base-ui.com) (shadcn `base-nova` style) for headless 
 - `primitives/Switch` — Base UI toggle switch
 - `primitives/Checkbox` — Base UI checkbox with determinate + indeterminate states
 - `primitives/Field` — Base UI form field (Root/Label/Control/Description/Error/Validity)
+- `layout/PageContainer` — top-level 14/16-col grid wrapper
+- `layout/SectionContainer` — section wrapper with configurable vertical spacing
+- `marketing/Marquee` — seamless horizontally-scrolling container with edge fade + reduced-motion support
+- `marketing/Callout` — info/success/warning/critical/note alert block (maps to `--status-*` tokens)
+- `marketing/StatsGrid` — responsive grid of label/value stat cards
+- `marketing/FeatureGrid` — responsive grid of icon/title/description feature cards
 
-More primitives (Menu, Toast), layout components (Header, Footer, MobileDrawer, PageContainer), navigation (Breadcrumbs, SlidingTabs), cards (ActionCard, NewsCard), marketing sections (Hero, FeatureGrid, StatsGrid, CodeExample), and chart theming wrappers land in follow-up releases.
+More primitives (Menu, Toast), layout components (Header, Footer, MobileDrawer), navigation (Breadcrumbs, SlidingTabs), cards (ActionCard, NewsCard), marketing sections (Hero, CodeExample), and chart theming wrappers land in follow-up releases.
 
 ## Install
 
@@ -82,6 +88,8 @@ import { cn, useWideGrid } from '@precisa-saude/ui';
 | `@precisa-saude/ui/hooks`      | `useMediaQuery`, `useWideGrid`, `useDesktop`, `useGridCol`, `useReducedMotion`                                                                |
 | `@precisa-saude/ui/decorative` | `CornerSquares`, `DuotoneFilter`, `GridOverlay`, `MosaicBg`                                                                                   |
 | `@precisa-saude/ui/primitives` | `Button`, `Badge`, `Tooltip`, `Select`, `Dialog`, `Tabs`, `Accordion`, `Popover`, `Switch`, `Checkbox`, `Field` (+ sub-components / variants) |
+| `@precisa-saude/ui/layout`     | `PageContainer`, `SectionContainer`                                                                                                           |
+| `@precisa-saude/ui/marketing`  | `Marquee`, `Callout`, `StatsGrid`, `FeatureGrid`                                                                                              |
 
 Tree-shakable: bundle only what you import.
 
