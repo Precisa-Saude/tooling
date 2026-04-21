@@ -23,6 +23,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./decorative": {
+      "types": "./dist/decorative/index.d.ts",
+      "import": "./dist/decorative/index.js"
+    },
     "./hooks": {
       "types": "./dist/hooks/index.d.ts",
       "import": "./dist/hooks/index.js"

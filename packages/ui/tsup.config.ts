@@ -4,6 +4,7 @@ export default defineConfig({
   clean: true,
   dts: true,
   entry: {
+    'decorative/index': 'src/decorative/index.ts',
     'hooks/index': 'src/hooks/index.ts',
     index: 'src/index.ts',
     'utils/index': 'src/utils/index.ts',
