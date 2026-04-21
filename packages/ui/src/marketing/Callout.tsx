@@ -68,8 +68,10 @@ export function Callout({
   variant = 'info',
   ...props
 }: CalloutProps) {
-  const resolvedVariant = variant ?? 'info';
-  const Icon = icon === undefined ? DEFAULT_ICONS[resolvedVariant] : null;
+  const DefaultIcon = DEFAULT_ICONS[variant ?? 'info'];
+  // Three cases: `null` opts out entirely; a ReactNode overrides the default;
+  // `undefined` (prop not passed) falls back to the variant's default icon.
+  const iconEl = icon === null ? null : icon !== undefined ? icon : <DefaultIcon aria-hidden />;
 
   return (
     <div
@@ -78,7 +80,7 @@ export function Callout({
       className={cn(calloutVariants({ variant }), className)}
       {...props}
     >
-      {icon === null ? null : icon !== undefined ? icon : Icon ? <Icon aria-hidden /> : null}
+      {iconEl}
       <div className="flex-1">
         {title ? <div className="mb-1 font-medium">{title}</div> : null}
         {children}
