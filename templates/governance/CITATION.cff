@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+title: '{{REPO_NAME}}'
+message: 'If you use this software, please cite it as below.'
+type: software
+authors:
+  - name: '{{OWNER_ORG}}'
+repository-code: 'https://github.com/{{REPO_SLUG}}'
+license: Apache-2.0

@@ -1,0 +1,21 @@
+# Full-checks hook. Runs the same gates as CI so a failing push is caught locally.
+# Per-repo coverage thresholds live in vitest config, not here.
+
+set -e
+
+echo "→ verifying lockfile is in sync"
+pnpm install --frozen-lockfile --prefer-offline
+
+echo "→ prettier"
+pnpm format:check
+
+echo "→ eslint"
+pnpm -r lint
+
+echo "→ typescript"
+pnpm -r typecheck
+
+echo "→ tests"
+pnpm -r test
+
+echo "✓ pre-push checks passed"
