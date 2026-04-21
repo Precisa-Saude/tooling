@@ -3,7 +3,7 @@ import { XIcon } from 'lucide-react';
 
 import { cn } from '../utils/cn.js';
 
-export const ToastProvider = ToastPrimitive.Provider;
+export const ToastProvider: typeof ToastPrimitive.Provider = ToastPrimitive.Provider;
 // Explicit type annotation required: the inferred type references an internal
 // Base UI path that tsc can't emit stably in .d.ts (TS2742).
 export const ToastPortal: typeof ToastPrimitive.Portal = ToastPrimitive.Portal;

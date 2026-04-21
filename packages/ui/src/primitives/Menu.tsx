@@ -3,12 +3,12 @@ import { CheckIcon, ChevronRightIcon, CircleIcon } from 'lucide-react';
 
 import { cn } from '../utils/cn.js';
 
-export const Menu = MenuPrimitive.Root;
-export const MenuTrigger = MenuPrimitive.Trigger;
-export const MenuPortal = MenuPrimitive.Portal;
-export const MenuGroup = MenuPrimitive.Group;
-export const MenuRadioGroup = MenuPrimitive.RadioGroup;
-export const MenuSubmenuRoot = MenuPrimitive.SubmenuRoot;
+export const Menu: typeof MenuPrimitive.Root = MenuPrimitive.Root;
+export const MenuTrigger: typeof MenuPrimitive.Trigger = MenuPrimitive.Trigger;
+export const MenuPortal: typeof MenuPrimitive.Portal = MenuPrimitive.Portal;
+export const MenuGroup: typeof MenuPrimitive.Group = MenuPrimitive.Group;
+export const MenuRadioGroup: typeof MenuPrimitive.RadioGroup = MenuPrimitive.RadioGroup;
+export const MenuSubmenuRoot: typeof MenuPrimitive.SubmenuRoot = MenuPrimitive.SubmenuRoot;
 
 export function MenuContent({
   align = 'start',
