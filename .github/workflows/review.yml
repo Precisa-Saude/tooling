@@ -109,15 +109,16 @@ jobs:
           fi
 
       - name: Call Anthropic API
+        id: call
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           DIFF_TRUNCATED: ${{ steps.pr.outputs.diff_truncated }}
           REVIEW_ROUND: ${{ needs.check-review-status.outputs.review_round }}
         run: |
           if [ -z "$ANTHROPIC_API_KEY" ]; then
-            echo "::error::ANTHROPIC_API_KEY repository secret is not configured. Skipping review."
-            echo '{"summary":"Skipped — secret missing","changes":[],"feedback":[]}' > review.json
-            echo '{}' > review-usage.json
+            echo "::warning::ANTHROPIC_API_KEY is not configured — skipping review. Round marker NOT emitted, so the next PR activity will retry as Round 1."
+            echo "status=skipped" >> $GITHUB_OUTPUT
+            echo "error_reason=secret missing" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -177,10 +178,11 @@ jobs:
             -d @/tmp/request.json)
 
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "::error::Anthropic API returned HTTP $HTTP_CODE"
+            echo "::warning::Anthropic API returned HTTP $HTTP_CODE. Round marker NOT emitted, so the next PR activity will retry as Round 1."
             cat /tmp/response.json
-            echo '{"summary":"API error — see workflow logs","changes":[],"feedback":[]}' > review.json
-            echo '{}' > review-usage.json
+            REASON=$(node -e "try { const r = JSON.parse(require('fs').readFileSync('/tmp/response.json','utf8')); process.stdout.write(r.error?.message || r.message || 'see workflow logs'); } catch (e) { process.stdout.write('see workflow logs'); }")
+            echo "status=error" >> $GITHUB_OUTPUT
+            echo "error_reason=HTTP ${HTTP_CODE}: ${REASON}" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -190,6 +192,7 @@ jobs:
             fs.writeFileSync('review.json', resp.content[0].text);
             fs.writeFileSync('review-usage.json', JSON.stringify(resp.usage || {}));
           "
+          echo "status=ok" >> $GITHUB_OUTPUT
 
       - name: Post review
         uses: actions/github-script@v8
@@ -200,6 +203,23 @@ jobs:
             const prNumber = ${{ steps.pr.outputs.number }};
             const headSha = '${{ steps.pr.outputs.head_sha }}';
             const round = '${{ needs.check-review-status.outputs.review_round }}';
+            const status = '${{ steps.call.outputs.status }}';
+            const errorReason = `${{ steps.call.outputs.error_reason }}`;
+
+            // Skip posting if the API call was skipped/errored. No round marker
+            // is emitted, so the next push will retry fresh as Round 1.
+            if (status !== 'ok') {
+              const note = status === 'skipped'
+                ? `Review skipped — ${errorReason}. No round marker emitted; the next PR activity will retry as Round 1.`
+                : `Review failed — ${errorReason}. No round marker emitted; the next PR activity will retry as Round 1.`;
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: `### Claude Review — not posted\n\n${note}`,
+              });
+              return;
+            }
 
             const raw = fs.readFileSync('review.json', 'utf8').trim();
             let review;
