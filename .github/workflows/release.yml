@@ -38,6 +38,22 @@ jobs:
       - name: Build
         run: pnpm -r build
 
+      - name: Configure npm auth
+        # actions/setup-node writes ~/.npmrc with a ${NODE_AUTH_TOKEN} placeholder
+        # that `npm` interpolates at publish time, but `pnpm publish` (used by our
+        # semantic-release `publishCmd`) doesn't always expand it. Write the
+        # resolved token directly so pnpm reads it unambiguously. Lives in $HOME
+        # so it doesn't pollute the repo working tree.
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NPM_TOKEN}" ]; then
+            echo "::error::NPM_TOKEN secret is not configured"
+            exit 1
+          fi
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "${HOME}/.npmrc"
+          echo "registry=https://registry.npmjs.org/" >> "${HOME}/.npmrc"
+
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
