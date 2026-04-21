@@ -157,7 +157,7 @@ importers:
         specifier: ^3.0.0
         version: 3.8.3
       prettier-plugin-packagejson:
-        specifier: ^3.0.2
+        specifier: ^3.0.0
         version: 3.0.2(prettier@3.8.3)
       prettier-plugin-tailwindcss:
         specifier: ^0.6.0 || ^0.7.0
