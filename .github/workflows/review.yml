@@ -163,6 +163,23 @@ jobs:
             '- If no issues, return an empty feedback array.',
           ].join('\n');
 
+          // Per-1M-token USD pricing. Update when providers change rates.
+          // Missing entries silently skip cost display (tokens still shown).
+          const PRICING = {
+            'claude-haiku-4-5-20251001': { in: 1.00, out: 5.00 },
+            'claude-sonnet-4-6': { in: 3.00, out: 15.00 },
+            'claude-opus-4-7': { in: 15.00, out: 75.00 },
+            'gpt-4o-mini': { in: 0.15, out: 0.60 },
+            'gpt-4o': { in: 2.50, out: 10.00 },
+            'gpt-5-mini': { in: 0.25, out: 2.00 },
+          };
+
+          function computeCost(model, promptTokens, completionTokens) {
+            const rate = PRICING[model];
+            if (!rate) return null;
+            return (promptTokens / 1_000_000) * rate.in + (completionTokens / 1_000_000) * rate.out;
+          }
+
           const providers = {
             anthropic: {
               label: 'Anthropic',
@@ -184,6 +201,10 @@ jobs:
                 }),
               }),
               extractText: (r) => r?.content?.[0]?.text ?? '',
+              extractUsage: (r) => ({
+                prompt_tokens: r?.usage?.input_tokens ?? 0,
+                completion_tokens: r?.usage?.output_tokens ?? 0,
+              }),
               extractError: (r) => r?.error?.message ?? r?.message ?? 'see workflow logs',
             },
             openai: {
@@ -208,6 +229,10 @@ jobs:
                 }),
               }),
               extractText: (r) => r?.choices?.[0]?.message?.content ?? '',
+              extractUsage: (r) => ({
+                prompt_tokens: r?.usage?.prompt_tokens ?? 0,
+                completion_tokens: r?.usage?.completion_tokens ?? 0,
+              }),
               extractError: (r) => r?.error?.message ?? 'see workflow logs',
             },
           };
@@ -249,7 +274,8 @@ jobs:
                 };
               }
               const reviewText = p.extractText(parsed);
-              return { ok: true, provider: name, model, reviewText };
+              const usage = p.extractUsage(parsed);
+              return { ok: true, provider: name, model, reviewText, usage };
             } catch (e) {
               return { ok: false, reason: `network error: ${e.message}`, provider: name, model };
             }
@@ -291,15 +317,23 @@ jobs:
             setOutput('status', 'ok');
             setOutput('provider_label', providers[winner.provider].label);
             setOutput('provider_model', winner.model);
-            // Attach fallback note if any provider before the winner failed
+
+            const promptTokens = winner.usage.prompt_tokens;
+            const completionTokens = winner.usage.completion_tokens;
+            const cost = computeCost(winner.model, promptTokens, completionTokens);
+            setOutput('prompt_tokens', String(promptTokens));
+            setOutput('completion_tokens', String(completionTokens));
+            setOutput('cost_usd', cost == null ? '' : cost.toFixed(4));
+
+            // Emit fallback details to the workflow log (not the PR comment).
             const failed = attempts.filter((a) => !a.ok && !a.skip);
-            if (failed.length > 0) {
+            const fellBack = failed.length > 0;
+            setOutput('fell_back', fellBack ? 'true' : 'false');
+            if (fellBack) {
               const notes = failed
                 .map((a) => `${providers[a.provider].label} failed: ${a.reason}`)
                 .join('; ');
-              setOutput('fallback_note', notes);
-            } else {
-              setOutput('fallback_note', '');
+              console.log(`::notice::Fell back to ${providers[winner.provider].label}. ${notes}`);
             }
           })();
           SCRIPT
@@ -317,7 +351,17 @@ jobs:
             const errorReason = `${{ steps.call.outputs.error_reason }}`;
             const providerLabel = `${{ steps.call.outputs.provider_label }}`;
             const providerModel = `${{ steps.call.outputs.provider_model }}`;
-            const fallbackNote = `${{ steps.call.outputs.fallback_note }}`;
+            const promptTokens = Number(`${{ steps.call.outputs.prompt_tokens }}` || '0');
+            const completionTokens = Number(`${{ steps.call.outputs.completion_tokens }}` || '0');
+            const costUsd = `${{ steps.call.outputs.cost_usd }}`;
+            const fellBack = `${{ steps.call.outputs.fell_back }}` === 'true';
+
+            const fmt = (n) => n.toLocaleString('en-US');
+            const costPart = costUsd ? ` | $${costUsd}` : '';
+            const usagePart = promptTokens + completionTokens > 0
+              ? ` | ${fmt(promptTokens)} in / ${fmt(completionTokens)} out${costPart}`
+              : '';
+            const fallbackBadge = fellBack ? ' (fallback)' : '';
 
             // Failure paths — no round marker, so the next push retries fresh.
             if (status !== 'ok') {
@@ -344,7 +388,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
-                body: `## Automated Review (Round ${round})\n\n${raw}\n\n---\n*Reviewed by ${providerLabel} ${providerModel}*`,
+                body: `## Automated Review (Round ${round})\n\n${raw}\n\n---\n*Reviewed by ${providerLabel} ${providerModel}${fallbackBadge}${usagePart}*`,
               });
               return;
             }
@@ -363,8 +407,7 @@ jobs:
             body += feedback.length === 0
               ? `:white_check_mark: No issues found\n\n`
               : `:mag: Found ${feedback.length} suggestion${feedback.length === 1 ? '' : 's'} (see inline comments)\n\n`;
-            body += `*Reviewed by ${providerLabel} ${providerModel}`;
-            if (fallbackNote) body += ` (fallback: ${fallbackNote})`;
+            body += `*Reviewed by ${providerLabel} ${providerModel}${fallbackBadge}${usagePart}`;
             body += isRound1 ? ` — Round 1 of 2*` : ` — Round 2 (Final); no further reviews will be performed*`;
 
             await github.rest.issues.createComment({
