@@ -1,0 +1,41 @@
+{
+  "name": "@precisa-saude/themes",
+  "version": "0.0.0",
+  "description": "Shared CSS design tokens (colors, grid, typography scaffolding, status semantics) for Precisa Saúde repositories.",
+  "keywords": [
+    "css",
+    "design-tokens",
+    "themes",
+    "oklch",
+    "tailwind",
+    "precisa-saude"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Precisa-Saude/tooling.git",
+    "directory": "packages/themes"
+  },
+  "license": "Apache-2.0",
+  "author": "Precisa Saúde",
+  "exports": {
+    ".": "./index.css",
+    "./index.css": "./index.css",
+    "./base.css": "./base.css",
+    "./colors.css": "./colors.css",
+    "./grid.css": "./grid.css",
+    "./status.css": "./status.css",
+    "./animations.css": "./animations.css"
+  },
+  "files": [
+    "index.css",
+    "base.css",
+    "colors.css",
+    "grid.css",
+    "status.css",
+    "animations.css",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

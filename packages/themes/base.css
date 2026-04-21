@@ -1,0 +1,60 @@
+/**
+ * Base typography, spacing, radius, shadows, tracking.
+ *
+ * No @font-face declarations — consumers import their own fonts and
+ * override --font-sans / --font-serif / --font-mono on :root. The default
+ * chains fall back to system UI fonts so sites work without any extra setup.
+ */
+
+@layer base {
+  :root {
+    /* Typography — override on :root to inject custom fonts */
+    --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+    --font-mono:
+      'JetBrains Mono', 'SF Mono', Menlo, Consolas, 'Liberation Mono', ui-monospace, monospace;
+
+    /* Spacing unit — used by Tailwind's spacing scale when multiplied */
+    --spacing: 0.25rem;
+
+    /* Letter-spacing / tracking scale */
+    --letter-spacing: 0em;
+    --tracking-normal: 0em;
+    --tracking-tighter: calc(var(--tracking-normal) - 0.05em);
+    --tracking-tight: calc(var(--tracking-normal) - 0.025em);
+    --tracking-wide: calc(var(--tracking-normal) + 0.025em);
+    --tracking-wider: calc(var(--tracking-normal) + 0.05em);
+    --tracking-widest: calc(var(--tracking-normal) + 0.1em);
+
+    /* Border radius */
+    --radius: 0.625rem;
+
+    /* Shadows — neutral, work in light mode */
+    --shadow-color: hsl(0 0% 20%);
+    --shadow-opacity: 0.12;
+    --shadow-blur: 10px;
+    --shadow-spread: 0px;
+    --shadow-offset-x: 0px;
+    --shadow-offset-y: 4px;
+    --shadow-2xs: 0px 4px 10px 0px hsl(0 0% 20% / 0.06);
+    --shadow-xs: 0px 4px 10px 0px hsl(0 0% 20% / 0.06);
+    --shadow-sm: 0px 4px 10px 0px hsl(0 0% 20% / 0.12), 0px 1px 2px -1px hsl(0 0% 20% / 0.12);
+    --shadow: 0px 4px 10px 0px hsl(0 0% 20% / 0.12), 0px 1px 2px -1px hsl(0 0% 20% / 0.12);
+    --shadow-md: 0px 4px 10px 0px hsl(0 0% 20% / 0.12), 0px 2px 4px -1px hsl(0 0% 20% / 0.12);
+    --shadow-lg: 0px 4px 10px 0px hsl(0 0% 20% / 0.12), 0px 4px 6px -1px hsl(0 0% 20% / 0.12);
+    --shadow-xl: 0px 4px 10px 0px hsl(0 0% 20% / 0.12), 0px 8px 10px -1px hsl(0 0% 20% / 0.12);
+    --shadow-2xl: 0px 4px 10px 0px hsl(0 0% 20% / 0.3);
+  }
+
+  .dark {
+    --shadow-color: hsl(0 0% 0%);
+    --shadow-2xs: 0px 4px 10px 0px hsl(0 0% 0% / 0.15);
+    --shadow-xs: 0px 4px 10px 0px hsl(0 0% 0% / 0.15);
+    --shadow-sm: 0px 4px 10px 0px hsl(0 0% 0% / 0.2), 0px 1px 2px -1px hsl(0 0% 0% / 0.2);
+    --shadow: 0px 4px 10px 0px hsl(0 0% 0% / 0.2), 0px 1px 2px -1px hsl(0 0% 0% / 0.2);
+    --shadow-md: 0px 4px 10px 0px hsl(0 0% 0% / 0.2), 0px 2px 4px -1px hsl(0 0% 0% / 0.2);
+    --shadow-lg: 0px 4px 10px 0px hsl(0 0% 0% / 0.2), 0px 4px 6px -1px hsl(0 0% 0% / 0.2);
+    --shadow-xl: 0px 4px 10px 0px hsl(0 0% 0% / 0.2), 0px 8px 10px -1px hsl(0 0% 0% / 0.2);
+    --shadow-2xl: 0px 4px 10px 0px hsl(0 0% 0% / 0.4);
+  }
+}

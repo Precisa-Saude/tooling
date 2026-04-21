@@ -1,0 +1,16 @@
+/**
+ * Convenience: imports every token file in the correct cascade order.
+ *
+ * Import in your app's top-level CSS:
+ *   @import '@precisa-saude/themes';
+ *
+ * Or cherry-pick the modules you need:
+ *   @import '@precisa-saude/themes/base.css';
+ *   @import '@precisa-saude/themes/colors.css';
+ */
+
+@import './base.css';
+@import './colors.css';
+@import './grid.css';
+@import './status.css';
+@import './animations.css';
