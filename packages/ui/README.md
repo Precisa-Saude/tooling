@@ -6,15 +6,19 @@ Built on [Base UI](https://base-ui.com) (shadcn `base-nova` style) for headless 
 
 ## Status
 
-**In early development.** Current surface (v0):
+**In early development.** Current surface:
 
 - `utils/cn()` — Tailwind class merger (clsx + tailwind-merge)
 - `hooks/useMediaQuery` — SSR-safe matchMedia subscription
 - `hooks/useWideGrid` / `useDesktop` — viewport breakpoints aligned with `@precisa-saude/themes/grid.css`
 - `hooks/useGridCol` — inline-style builder for the 14/16-col grid
 - `hooks/useReducedMotion` — `prefers-reduced-motion` subscription
+- `decorative/CornerSquares` — two-square corner accents on the responsive grid
+- `decorative/DuotoneFilter` — SVG filter for duotone image treatments (dark shadows → light highlights, configurable)
+- `decorative/GridOverlay` — dev-mode fixed overlay that visualizes the 14/16-col grid (press `g` to cycle)
+- `decorative/MosaicBg` — canvas-based animated mosaic background with OKLCh color interpolation
 
-Primitives (Button, Select, Dialog, Tooltip, …), layout components (Header, Footer, MobileDrawer, PageContainer), navigation (Breadcrumbs, SlidingTabs), cards (ActionCard, NewsCard), marketing sections (Hero, FeatureGrid, StatsGrid, CodeExample), decorative (GridOverlay, MosaicBg, CornerSquares, DuotoneFilter), and chart theming wrappers land in follow-up releases.
+Primitives (Button, Select, Dialog, Tooltip, …), layout components (Header, Footer, MobileDrawer, PageContainer), navigation (Breadcrumbs, SlidingTabs), cards (ActionCard, NewsCard), marketing sections (Hero, FeatureGrid, StatsGrid, CodeExample), and chart theming wrappers land in follow-up releases.
 
 ## Install
 
@@ -60,11 +64,12 @@ import { cn, useWideGrid } from '@precisa-saude/ui';
 
 ## Sub-path exports
 
-| Path                      | Contents                                                                       |
-| ------------------------- | ------------------------------------------------------------------------------ |
-| `@precisa-saude/ui`       | Everything (utils + hooks — and as components land, those too)                 |
-| `@precisa-saude/ui/utils` | `cn`                                                                           |
-| `@precisa-saude/ui/hooks` | `useMediaQuery`, `useWideGrid`, `useDesktop`, `useGridCol`, `useReducedMotion` |
+| Path                           | Contents                                                                       |
+| ------------------------------ | ------------------------------------------------------------------------------ |
+| `@precisa-saude/ui`            | Everything (re-exports from all sub-paths)                                     |
+| `@precisa-saude/ui/utils`      | `cn`                                                                           |
+| `@precisa-saude/ui/hooks`      | `useMediaQuery`, `useWideGrid`, `useDesktop`, `useGridCol`, `useReducedMotion` |
+| `@precisa-saude/ui/decorative` | `CornerSquares`, `DuotoneFilter`, `GridOverlay`, `MosaicBg`                    |
 
 Tree-shakable: bundle only what you import.
 
