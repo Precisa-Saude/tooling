@@ -1,6 +1,6 @@
 # @precisa-saude/cli
 
-The `precisa` CLI — scaffold new repos, sync existing ones, audit drift.
+The `precisa` CLI — scaffold new repos, sync existing ones, audit drift against the shared template set.
 
 ## Install
 
@@ -31,23 +31,41 @@ precisa new internal-tool --profile private-app
 
 Options:
 
-- `--profile <profile>`: preset (`oss-library` | `oss-site` | `private-app`). Interactive prompts fill the rest.
-- `--dry-run`: print what would be written without touching disk.
+- `--profile <profile>` — preset. One of:
+  - `oss-library` — public repo that publishes npm packages (default)
+  - `oss-site` — public repo with a website, no npm publish
+  - `private-app` — internal repo with a website + packages, no npm publish
+- `--dry-run` — print the planned file list without writing.
+
+Interactive prompts ask for the GitHub owner, contact emails, and commit scopes. After rendering, the CLI runs `git init` and `pnpm install` in the new directory.
 
 ### `precisa sync`
 
 Re-render templates against the current repo's `.precisa.json` manifest.
 
 ```bash
-precisa sync           # apply (with confirmation)
-precisa sync --dry-run # preview diff
+precisa sync            # apply
+precisa sync --dry-run  # preview (shows unified diffs)
 ```
 
-Files are merged according to per-template strategy:
+Per-file merge strategies (declared in `templates/templates.manifest.yml`):
 
-- **Overwrite**: workflows, hooks, `.editorconfig`, `.nvmrc`, governance boilerplate
-- **Merge JSON**: managed keys in `package.json`
-- **Preserve**: `CLAUDE.md`, `README.md`, `CONTRIBUTING.md` (emit diff only)
+- **overwrite** — replace the target; source of truth is the template.
+- **merge_json** — three-way-ish JSON merge: repo-local keys win on conflicts; template adds missing keys.
+- **preserve** — never overwrite; `sync` prints the diff as a suggestion.
+- **skip_if_exists** — create only if the target doesn't exist.
+
+Output per file:
+
+| Icon          | Meaning                                                                   |
+| ------------- | ------------------------------------------------------------------------- |
+| `+` create    | Target didn't exist; rendered from template                               |
+| `~` update    | Target existed; overwritten (dry-run shows unified diff)                  |
+| `~` merge     | JSON merge applied                                                        |
+| `i` preserve  | Target differs from template; left in place (dry-run shows would-be diff) |
+| `=` unchanged | Target already matches template                                           |
+| `s` skip      | Target exists; skip_if_exists prevented change                            |
+| `!` error     | JSON parse error or unknown merge strategy                                |
 
 ### `precisa doctor`
 
@@ -57,7 +75,14 @@ Audit the repo without writing anything.
 precisa doctor
 ```
 
-Exit code is non-zero if error-severity drift is found.
+Reports per template:
+
+- ✓ **ok** — present and matches template
+- ! **warning** — present but differs (run `sync` to update)
+- ✗ **error** — required template is missing
+- i **info** — preserve-strategy template differs (suggestion only, not drift)
+
+Exits non-zero on any error-severity drift.
 
 ## `.precisa.json` manifest
 
@@ -66,11 +91,13 @@ Every consumer repo declares its profile:
 ```json
 {
   "schemaVersion": 1,
+  "name": "my-repo",
+  "owner": "Precisa-Saude",
   "visibility": "oss",
   "hasSite": true,
   "hasPackages": true,
   "publishesToNpm": true,
-  "commitScopes": ["core", "docs", "ci", "deps"],
+  "commitScopes": ["core", "calculators", "ocr-utils", "rnds", "docs", "ci", "deps"],
   "contactEmails": {
     "security": "security@precisa-saude.com.br",
     "conduct": "conduct@precisa-saude.com.br"
@@ -80,9 +107,24 @@ Every consumer repo declares its profile:
 }
 ```
 
-## Status
+The manifest is the single source of truth for which templates apply (`required_when` gates match `visibility` / `hasSite` / `hasPackages` / `publishesToNpm`) and which values get substituted into `{{TOKEN}}` placeholders.
 
-This package is **in early development**. The command shells and manifest schema are stable, but `new`, `sync`, and `doctor` currently print their planned behavior rather than executing it. Real implementation lands in subsequent releases.
+## Template tokens
+
+| Token                                                        | Source                                     |
+| ------------------------------------------------------------ | ------------------------------------------ |
+| `{{REPO_NAME}}`                                              | manifest `name`                            |
+| `{{OWNER_ORG}}`                                              | manifest `owner`                           |
+| `{{REPO_SLUG}}`                                              | `${owner}/${name}`                         |
+| `{{VISIBILITY}}`                                             | manifest `visibility`                      |
+| `{{NODE_VERSION}}`                                           | manifest `nodeVersion` (default: `22`)     |
+| `{{PNPM_VERSION}}`                                           | manifest `pnpmVersion` (default: `9.15.9`) |
+| `{{SECURITY_EMAIL}}`                                         | manifest `contactEmails.security`          |
+| `{{CONDUCT_EMAIL}}`                                          | manifest `contactEmails.conduct`           |
+| `{{COMMIT_SCOPES}}`                                          | manifest `commitScopes` (comma-joined)     |
+| `{{HAS_SITE}}` / `{{HAS_PACKAGES}}` / `{{PUBLISHES_TO_NPM}}` | boolean manifest fields                    |
+
+Unknown tokens are left untouched so missing keys are visible in output.
 
 ## License
 
