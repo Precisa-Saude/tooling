@@ -1,0 +1,43 @@
+{
+  "name": "@precisa-saude/prettier-config",
+  "version": "0.0.0",
+  "description": "Shared Prettier config for Precisa Saúde repositories.",
+  "keywords": [
+    "prettier",
+    "prettier-config",
+    "precisa-saude"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Precisa-Saude/tooling.git",
+    "directory": "packages/prettier-config"
+  },
+  "license": "Apache-2.0",
+  "author": "Precisa Saúde",
+  "type": "module",
+  "exports": {
+    ".": "./index.json",
+    "./tailwind": "./tailwind.json"
+  },
+  "main": "./index.json",
+  "files": [
+    "index.json",
+    "tailwind.json",
+    "README.md"
+  ],
+  "dependencies": {
+    "prettier-plugin-packagejson": "^3.0.2"
+  },
+  "peerDependencies": {
+    "prettier": "^3.0.0",
+    "prettier-plugin-tailwindcss": "^0.6.0 || ^0.7.0"
+  },
+  "peerDependenciesMeta": {
+    "prettier-plugin-tailwindcss": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
