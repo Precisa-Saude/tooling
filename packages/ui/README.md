@@ -17,8 +17,12 @@ Built on [Base UI](https://base-ui.com) (shadcn `base-nova` style) for headless 
 - `decorative/DuotoneFilter` — SVG filter for duotone image treatments (dark shadows → light highlights, configurable)
 - `decorative/GridOverlay` — dev-mode fixed overlay that visualizes the 14/16-col grid (press `g` to cycle)
 - `decorative/MosaicBg` — canvas-based animated mosaic background with OKLCh color interpolation
+- `primitives/Button` — Base UI button with CVA variants (default/outline/secondary/ghost/destructive/link × xs/sm/default/lg/icon sizes)
+- `primitives/Badge` — pill label with CVA variants (default/secondary/destructive/outline + success/warning/elevated/critical/info semantic variants)
+- `primitives/Tooltip` — Base UI tooltip (Provider/Root/Trigger/Content sub-components + convenience `Tooltip` wrapper)
+- `primitives/Select` — Base UI select with full sub-component set (Trigger/Content/Item/Label/Separator/Group/Value/ScrollUp/ScrollDown)
 
-Primitives (Button, Select, Dialog, Tooltip, …), layout components (Header, Footer, MobileDrawer, PageContainer), navigation (Breadcrumbs, SlidingTabs), cards (ActionCard, NewsCard), marketing sections (Hero, FeatureGrid, StatsGrid, CodeExample), and chart theming wrappers land in follow-up releases.
+More primitives (Dialog, Tabs, Accordion, Popover, Menu, Toast, Switch, Checkbox, Field), layout components (Header, Footer, MobileDrawer, PageContainer), navigation (Breadcrumbs, SlidingTabs), cards (ActionCard, NewsCard), marketing sections (Hero, FeatureGrid, StatsGrid, CodeExample), and chart theming wrappers land in follow-up releases.
 
 ## Install
 
@@ -70,6 +74,7 @@ import { cn, useWideGrid } from '@precisa-saude/ui';
 | `@precisa-saude/ui/utils`      | `cn`                                                                           |
 | `@precisa-saude/ui/hooks`      | `useMediaQuery`, `useWideGrid`, `useDesktop`, `useGridCol`, `useReducedMotion` |
 | `@precisa-saude/ui/decorative` | `CornerSquares`, `DuotoneFilter`, `GridOverlay`, `MosaicBg`                    |
+| `@precisa-saude/ui/primitives` | `Button`, `Badge`, `Tooltip`, `Select` (+ their sub-components / variants)     |
 
 Tree-shakable: bundle only what you import.
 
