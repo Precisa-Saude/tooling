@@ -1,5 +1,11 @@
 name: Code Review
 
+# Tries providers in order (Anthropic → OpenAI) and uses the first one that
+# returns a 200. Any non-200 from a provider triggers fallback to the next.
+# If all configured providers fail (or none are configured), the workflow
+# exits without posting a review and without emitting a round marker, so
+# the next PR activity retries fresh.
+
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -51,8 +57,8 @@ jobs:
               issue_number: prNumber,
               per_page: 100,
             });
-            const round1 = comments.some(c => c.body?.includes('<!-- CLAUDE_REVIEW_ROUND_1 -->'));
-            const round2 = comments.some(c => c.body?.includes('<!-- CLAUDE_REVIEW_ROUND_2_COMPLETE -->'));
+            const round1 = comments.some(c => c.body?.includes('<!-- AUTOMATED_REVIEW_ROUND_1 -->'));
+            const round2 = comments.some(c => c.body?.includes('<!-- AUTOMATED_REVIEW_ROUND_2_COMPLETE -->'));
 
             if (round2) {
               core.setOutput('should_run', 'false');
@@ -62,8 +68,8 @@ jobs:
             core.setOutput('should_run', 'true');
             core.setOutput('review_round', round1 ? '2' : '1');
 
-  claude-review:
-    name: Claude review
+  review:
+    name: Automated review
     needs: check-review-status
     if: needs.check-review-status.outputs.should_run == 'true'
     runs-on: ubuntu-latest
@@ -73,7 +79,8 @@ jobs:
       contents: read
       pull-requests: write
     env:
-      CLAUDE_MODEL: claude-haiku-4-5-20251001
+      ANTHROPIC_MODEL: claude-haiku-4-5-20251001
+      OPENAI_MODEL: gpt-4o-mini
       MAX_DIFF_SIZE: '150000'
     steps:
       - uses: actions/checkout@v4
@@ -108,22 +115,17 @@ jobs:
             echo "diff_truncated=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Call Anthropic API
+      - name: Call review API (with provider failover)
         id: call
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DIFF_TRUNCATED: ${{ steps.pr.outputs.diff_truncated }}
           REVIEW_ROUND: ${{ needs.check-review-status.outputs.review_round }}
         run: |
-          if [ -z "$ANTHROPIC_API_KEY" ]; then
-            echo "::warning::ANTHROPIC_API_KEY is not configured — skipping review. Round marker NOT emitted, so the next PR activity will retry as Round 1."
-            echo "status=skipped" >> $GITHUB_OUTPUT
-            echo "error_reason=secret missing" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
           node << 'SCRIPT'
           const fs = require('fs');
+
           const diff = fs.readFileSync('pr.diff', 'utf8');
           const files = fs.readFileSync('changed_files.txt', 'utf8').trim();
           const round = process.env.REVIEW_ROUND;
@@ -161,38 +163,146 @@ jobs:
             '- If no issues, return an empty feedback array.',
           ].join('\n');
 
-          const request = {
-            model: process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001',
-            max_tokens: 8192,
-            system,
-            messages: [{ role: 'user', content: user }],
+          const providers = {
+            anthropic: {
+              label: 'Anthropic',
+              envKey: 'ANTHROPIC_API_KEY',
+              modelEnv: 'ANTHROPIC_MODEL',
+              defaultModel: 'claude-haiku-4-5-20251001',
+              build: (model, key) => ({
+                url: 'https://api.anthropic.com/v1/messages',
+                headers: {
+                  'content-type': 'application/json',
+                  'x-api-key': key,
+                  'anthropic-version': '2023-06-01',
+                },
+                body: JSON.stringify({
+                  model,
+                  max_tokens: 8192,
+                  system,
+                  messages: [{ role: 'user', content: user }],
+                }),
+              }),
+              extractText: (r) => r?.content?.[0]?.text ?? '',
+              extractError: (r) => r?.error?.message ?? r?.message ?? 'see workflow logs',
+            },
+            openai: {
+              label: 'OpenAI',
+              envKey: 'OPENAI_API_KEY',
+              modelEnv: 'OPENAI_MODEL',
+              defaultModel: 'gpt-4o-mini',
+              build: (model, key) => ({
+                url: 'https://api.openai.com/v1/chat/completions',
+                headers: {
+                  'content-type': 'application/json',
+                  Authorization: `Bearer ${key}`,
+                },
+                body: JSON.stringify({
+                  model,
+                  max_tokens: 8192,
+                  messages: [
+                    { role: 'system', content: system },
+                    { role: 'user', content: user },
+                  ],
+                  response_format: { type: 'json_object' },
+                }),
+              }),
+              extractText: (r) => r?.choices?.[0]?.message?.content ?? '',
+              extractError: (r) => r?.error?.message ?? 'see workflow logs',
+            },
           };
-          fs.writeFileSync('/tmp/request.json', JSON.stringify(request));
+
+          // Provider order: try Anthropic, fall back to OpenAI.
+          const order = ['anthropic', 'openai'];
+
+          const setOutput = (k, v) => {
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `${k}<<EOF\n${String(v)}\nEOF\n`);
+          };
+
+          async function tryProvider(name) {
+            const p = providers[name];
+            const key = process.env[p.envKey];
+            if (!key) return { ok: false, reason: 'no key configured', skip: true };
+
+            const model = process.env[p.modelEnv] || p.defaultModel;
+            const req = p.build(model, key);
+
+            try {
+              const resp = await fetch(req.url, {
+                method: 'POST',
+                headers: req.headers,
+                body: req.body,
+              });
+              const text = await resp.text();
+              let parsed;
+              try {
+                parsed = JSON.parse(text);
+              } catch {
+                return { ok: false, reason: `HTTP ${resp.status}: non-JSON response`, provider: name, model };
+              }
+              if (!resp.ok) {
+                return {
+                  ok: false,
+                  reason: `HTTP ${resp.status}: ${p.extractError(parsed)}`,
+                  provider: name,
+                  model,
+                };
+              }
+              const reviewText = p.extractText(parsed);
+              return { ok: true, provider: name, model, reviewText };
+            } catch (e) {
+              return { ok: false, reason: `network error: ${e.message}`, provider: name, model };
+            }
+          }
+
+          (async () => {
+            const attempts = [];
+            let winner = null;
+
+            for (const name of order) {
+              const attempt = await tryProvider(name);
+              attempts.push(attempt);
+              if (attempt.ok) {
+                winner = attempt;
+                break;
+              }
+              if (attempt.skip) continue;
+              console.log(`::warning::${providers[name].label} failed: ${attempt.reason}`);
+            }
+
+            if (!winner) {
+              const configured = attempts.filter((a) => !a.skip);
+              if (configured.length === 0) {
+                console.log('::warning::No review providers configured. Skipping.');
+                setOutput('status', 'skipped');
+                setOutput('error_reason', 'no providers configured');
+              } else {
+                const reasons = configured
+                  .map((a) => `${providers[a.provider].label}: ${a.reason}`)
+                  .join('; ');
+                console.log(`::warning::All providers failed. ${reasons}`);
+                setOutput('status', 'error');
+                setOutput('error_reason', reasons);
+              }
+              return;
+            }
+
+            fs.writeFileSync('review.json', winner.reviewText);
+            setOutput('status', 'ok');
+            setOutput('provider_label', providers[winner.provider].label);
+            setOutput('provider_model', winner.model);
+            // Attach fallback note if any provider before the winner failed
+            const failed = attempts.filter((a) => !a.ok && !a.skip);
+            if (failed.length > 0) {
+              const notes = failed
+                .map((a) => `${providers[a.provider].label} failed: ${a.reason}`)
+                .join('; ');
+              setOutput('fallback_note', notes);
+            } else {
+              setOutput('fallback_note', '');
+            }
+          })();
           SCRIPT
-
-          HTTP_CODE=$(curl -sS -o /tmp/response.json -w "%{http_code}" \
-            https://api.anthropic.com/v1/messages \
-            -H "content-type: application/json" \
-            -H "x-api-key: $ANTHROPIC_API_KEY" \
-            -H "anthropic-version: 2023-06-01" \
-            -d @/tmp/request.json)
-
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "::warning::Anthropic API returned HTTP $HTTP_CODE. Round marker NOT emitted, so the next PR activity will retry as Round 1."
-            cat /tmp/response.json
-            REASON=$(node -e "try { const r = JSON.parse(require('fs').readFileSync('/tmp/response.json','utf8')); process.stdout.write(r.error?.message || r.message || 'see workflow logs'); } catch (e) { process.stdout.write('see workflow logs'); }")
-            echo "status=error" >> $GITHUB_OUTPUT
-            echo "error_reason=HTTP ${HTTP_CODE}: ${REASON}" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          node -e "
-            const fs = require('fs');
-            const resp = JSON.parse(fs.readFileSync('/tmp/response.json', 'utf8'));
-            fs.writeFileSync('review.json', resp.content[0].text);
-            fs.writeFileSync('review-usage.json', JSON.stringify(resp.usage || {}));
-          "
-          echo "status=ok" >> $GITHUB_OUTPUT
 
       - name: Post review
         uses: actions/github-script@v8
@@ -203,11 +313,13 @@ jobs:
             const prNumber = ${{ steps.pr.outputs.number }};
             const headSha = '${{ steps.pr.outputs.head_sha }}';
             const round = '${{ needs.check-review-status.outputs.review_round }}';
-            const status = '${{ steps.call.outputs.status }}';
+            const status = `${{ steps.call.outputs.status }}`;
             const errorReason = `${{ steps.call.outputs.error_reason }}`;
+            const providerLabel = `${{ steps.call.outputs.provider_label }}`;
+            const providerModel = `${{ steps.call.outputs.provider_model }}`;
+            const fallbackNote = `${{ steps.call.outputs.fallback_note }}`;
 
-            // Skip posting if the API call was skipped/errored. No round marker
-            // is emitted, so the next push will retry fresh as Round 1.
+            // Failure paths — no round marker, so the next push retries fresh.
             if (status !== 'ok') {
               const note = status === 'skipped'
                 ? `Review skipped — ${errorReason}. No round marker emitted; the next PR activity will retry as Round 1.`
@@ -216,7 +328,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
-                body: `### Claude Review — not posted\n\n${note}`,
+                body: `### Automated Review — not posted\n\n${note}`,
               });
               return;
             }
@@ -232,7 +344,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
-                body: `## Claude Review (Round ${round})\n\n${raw}\n\n---\n*Automated review*`,
+                body: `## Automated Review (Round ${round})\n\n${raw}\n\n---\n*Reviewed by ${providerLabel} ${providerModel}*`,
               });
               return;
             }
@@ -242,18 +354,18 @@ jobs:
             const feedback = review.feedback || [];
 
             const isRound1 = round === '1';
-            const marker = isRound1 ? '<!-- CLAUDE_REVIEW_ROUND_1 -->' : '<!-- CLAUDE_REVIEW_ROUND_2_COMPLETE -->';
+            const marker = isRound1 ? '<!-- AUTOMATED_REVIEW_ROUND_1 -->' : '<!-- AUTOMATED_REVIEW_ROUND_2_COMPLETE -->';
             const label = isRound1 ? 'Round 1' : 'Round 2 (Final)';
 
-            let body = `## Claude Review — ${label}\n\n${marker}\n\n`;
+            let body = `## Automated Review — ${label}\n\n${marker}\n\n`;
             body += `### Summary\n${summary}\n\n`;
             body += `### Changes\n${changes}\n\n---\n`;
             body += feedback.length === 0
               ? `:white_check_mark: No issues found\n\n`
               : `:mag: Found ${feedback.length} suggestion${feedback.length === 1 ? '' : 's'} (see inline comments)\n\n`;
-            body += isRound1
-              ? `*Automated review — Round 1 of 2*`
-              : `*Automated review — Round 2 (Final); no further reviews will be performed*`;
+            body += `*Reviewed by ${providerLabel} ${providerModel}`;
+            if (fallbackNote) body += ` (fallback: ${fallbackNote})`;
+            body += isRound1 ? ` — Round 1 of 2*` : ` — Round 2 (Final); no further reviews will be performed*`;
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
