@@ -21,8 +21,15 @@ Built on [Base UI](https://base-ui.com) (shadcn `base-nova` style) for headless 
 - `primitives/Badge` — pill label with CVA variants (default/secondary/destructive/outline + success/warning/elevated/critical/info semantic variants)
 - `primitives/Tooltip` — Base UI tooltip (Provider/Root/Trigger/Content sub-components + convenience `Tooltip` wrapper)
 - `primitives/Select` — Base UI select with full sub-component set (Trigger/Content/Item/Label/Separator/Group/Value/ScrollUp/ScrollDown)
+- `primitives/Dialog` — Base UI dialog with built-in backdrop + close button (Root/Trigger/Portal/Backdrop/Content/Header/Footer/Title/Description/Close)
+- `primitives/Tabs` — Base UI tabs (Root/List/Trigger/Panel/Indicator)
+- `primitives/Accordion` — Base UI accordion with chevron that rotates on open (Root/Item/Header/Trigger/Panel)
+- `primitives/Popover` — Base UI popover (Root/Trigger/Portal/Content/Close)
+- `primitives/Switch` — Base UI toggle switch
+- `primitives/Checkbox` — Base UI checkbox with determinate + indeterminate states
+- `primitives/Field` — Base UI form field (Root/Label/Control/Description/Error/Validity)
 
-More primitives (Dialog, Tabs, Accordion, Popover, Menu, Toast, Switch, Checkbox, Field), layout components (Header, Footer, MobileDrawer, PageContainer), navigation (Breadcrumbs, SlidingTabs), cards (ActionCard, NewsCard), marketing sections (Hero, FeatureGrid, StatsGrid, CodeExample), and chart theming wrappers land in follow-up releases.
+More primitives (Menu, Toast), layout components (Header, Footer, MobileDrawer, PageContainer), navigation (Breadcrumbs, SlidingTabs), cards (ActionCard, NewsCard), marketing sections (Hero, FeatureGrid, StatsGrid, CodeExample), and chart theming wrappers land in follow-up releases.
 
 ## Install
 
@@ -68,13 +75,13 @@ import { cn, useWideGrid } from '@precisa-saude/ui';
 
 ## Sub-path exports
 
-| Path                           | Contents                                                                       |
-| ------------------------------ | ------------------------------------------------------------------------------ |
-| `@precisa-saude/ui`            | Everything (re-exports from all sub-paths)                                     |
-| `@precisa-saude/ui/utils`      | `cn`                                                                           |
-| `@precisa-saude/ui/hooks`      | `useMediaQuery`, `useWideGrid`, `useDesktop`, `useGridCol`, `useReducedMotion` |
-| `@precisa-saude/ui/decorative` | `CornerSquares`, `DuotoneFilter`, `GridOverlay`, `MosaicBg`                    |
-| `@precisa-saude/ui/primitives` | `Button`, `Badge`, `Tooltip`, `Select` (+ their sub-components / variants)     |
+| Path                           | Contents                                                                                                                                      |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@precisa-saude/ui`            | Everything (re-exports from all sub-paths)                                                                                                    |
+| `@precisa-saude/ui/utils`      | `cn`                                                                                                                                          |
+| `@precisa-saude/ui/hooks`      | `useMediaQuery`, `useWideGrid`, `useDesktop`, `useGridCol`, `useReducedMotion`                                                                |
+| `@precisa-saude/ui/decorative` | `CornerSquares`, `DuotoneFilter`, `GridOverlay`, `MosaicBg`                                                                                   |
+| `@precisa-saude/ui/primitives` | `Button`, `Badge`, `Tooltip`, `Select`, `Dialog`, `Tabs`, `Accordion`, `Popover`, `Switch`, `Checkbox`, `Field` (+ sub-components / variants) |
 
 Tree-shakable: bundle only what you import.
 
