@@ -37,10 +37,19 @@ Built on [Base UI](https://base-ui.com) (shadcn `base-nova` style) for headless 
 - `cards/ActionCard` — icon + title + subtitle + chevron clickable card (renders as `<a>` or `<button>`)
 - `cards/NewsCard` — news/blog card with `compact` and `hero` layouts (tag badge, title, date, excerpt, tag pills, optional hero image)
 - `navigation/Breadcrumbs` — simple segmented breadcrumbs with customizable separator
+- `navigation/NavigationalBreadcrumbs` — breadcrumbs where each segment opens a searchable Popover of sibling options (with status dots, icons, check indicator)
 - `navigation/SlidingTabs` — pill-shaped tabs with an animated indicator (built on Base UI Tabs)
 - `navigation/Pagination` — numbered pagination with prev/next + optional page-size selector
-
-More primitives (Menu, Toast), layout components (Header, Footer, MobileDrawer), navigation extras (NavigationalBreadcrumbs with searchable dropdowns), marketing sections (Hero, CodeExample), and chart theming wrappers land in follow-up releases.
+- `primitives/Menu` — Base UI dropdown menu with Item / CheckboxItem / RadioItem / Group / Label / Separator / Shortcut / SubmenuRoot + SubmenuTrigger
+- `primitives/Toast` — Base UI toast system (Provider + Viewport + Root + Title + Description + Action + Close). Use `useToastManager()` from `@base-ui/react/toast` to emit imperatively.
+- `layout/Header` — fixed top nav with logo slot, desktop nav items, action slot, mobile-toggle button
+- `layout/Footer` — site footer with logo / socials / legal links / app-store badges / version pill (click to copy)
+- `layout/MobileDrawer` — slide-out drawer with profile header (avatar + name + email), menu list (icon + label + optional danger color), and footer slot (typically a version string)
+- `marketing/Hero` — layout shell with eyebrow + title + subtitle + primary/secondary CTAs + optional side slot; bring your own background
+- `marketing/CodeExample` — syntax-highlighted code block with optional copy button. Shiki is an **optional peer**: pass a pre-built highlighter, pre-rendered HTML, or skip both for plain-text fallback.
+- `charts/ChartContainer` — recharts `ResponsiveContainer` wrapper that applies token-backed grid/axis/tooltip styling. Recharts is an **optional peer** — consumers pass `ResponsiveContainer` in as a prop.
+- `charts/ChartTooltip` — shared `contentStyle` / `itemStyle` / `labelStyle` / `cursor` presets for recharts `<Tooltip>` + a `ChartTooltipBox` helper for custom tooltips.
+- `charts/ParticleCanvas`, `charts/WaveCanvas` — pure canvas animation primitives (promoted from platform's radar-chart). Honor `prefers-reduced-motion`.
 
 ## Install
 
@@ -86,17 +95,18 @@ import { cn, useWideGrid } from '@precisa-saude/ui';
 
 ## Sub-path exports
 
-| Path                           | Contents                                                                                                                                      |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@precisa-saude/ui`            | Everything (re-exports from all sub-paths)                                                                                                    |
-| `@precisa-saude/ui/utils`      | `cn`                                                                                                                                          |
-| `@precisa-saude/ui/hooks`      | `useMediaQuery`, `useWideGrid`, `useDesktop`, `useGridCol`, `useReducedMotion`                                                                |
-| `@precisa-saude/ui/decorative` | `CornerSquares`, `DuotoneFilter`, `GridOverlay`, `MosaicBg`                                                                                   |
-| `@precisa-saude/ui/primitives` | `Button`, `Badge`, `Tooltip`, `Select`, `Dialog`, `Tabs`, `Accordion`, `Popover`, `Switch`, `Checkbox`, `Field` (+ sub-components / variants) |
-| `@precisa-saude/ui/layout`     | `PageContainer`, `SectionContainer`                                                                                                           |
-| `@precisa-saude/ui/marketing`  | `Marquee`, `Callout`, `StatsGrid`, `FeatureGrid`                                                                                              |
-| `@precisa-saude/ui/cards`      | `ActionCard`, `NewsCard`                                                                                                                      |
-| `@precisa-saude/ui/navigation` | `Breadcrumbs`, `SlidingTabs`, `Pagination`                                                                                                    |
+| Path                           | Contents                                                                                                                                                       |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@precisa-saude/ui`            | Everything (re-exports from all sub-paths)                                                                                                                     |
+| `@precisa-saude/ui/utils`      | `cn`                                                                                                                                                           |
+| `@precisa-saude/ui/hooks`      | `useMediaQuery`, `useWideGrid`, `useDesktop`, `useGridCol`, `useReducedMotion`                                                                                 |
+| `@precisa-saude/ui/decorative` | `CornerSquares`, `DuotoneFilter`, `GridOverlay`, `MosaicBg`                                                                                                    |
+| `@precisa-saude/ui/primitives` | `Button`, `Badge`, `Tooltip`, `Select`, `Dialog`, `Tabs`, `Accordion`, `Popover`, `Switch`, `Checkbox`, `Field`, `Menu`, `Toast` (+ sub-components / variants) |
+| `@precisa-saude/ui/layout`     | `PageContainer`, `SectionContainer`, `Header`, `Footer`, `MobileDrawer`                                                                                        |
+| `@precisa-saude/ui/marketing`  | `Marquee`, `Callout`, `StatsGrid`, `FeatureGrid`, `Hero`, `CodeExample`                                                                                        |
+| `@precisa-saude/ui/cards`      | `ActionCard`, `NewsCard`                                                                                                                                       |
+| `@precisa-saude/ui/navigation` | `Breadcrumbs`, `NavigationalBreadcrumbs`, `SlidingTabs`, `Pagination`                                                                                          |
+| `@precisa-saude/ui/charts`     | `ChartContainer`, `ChartTooltipBox`, `chartTooltipStyles`, `ParticleCanvas`, `WaveCanvas`                                                                      |
 
 Tree-shakable: bundle only what you import.
 

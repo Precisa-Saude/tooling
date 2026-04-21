@@ -1,7 +1,11 @@
 export type { CalloutProps, CalloutVariantProps } from './Callout.js';
 export { Callout, calloutVariants } from './Callout.js';
+export type { CodeExampleProps } from './CodeExample.js';
+export { CodeExample } from './CodeExample.js';
 export type { FeatureGridProps, FeatureItem } from './FeatureGrid.js';
 export { FeatureGrid } from './FeatureGrid.js';
+export type { HeroProps } from './Hero.js';
+export { Hero } from './Hero.js';
 export type { MarqueeProps } from './Marquee.js';
 export { Marquee } from './Marquee.js';
 export type { StatItem, StatsGridProps } from './StatsGrid.js';

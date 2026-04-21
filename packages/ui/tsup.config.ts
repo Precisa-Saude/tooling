@@ -5,6 +5,7 @@ export default defineConfig({
   dts: true,
   entry: {
     'cards/index': 'src/cards/index.ts',
+    'charts/index': 'src/charts/index.ts',
     'decorative/index': 'src/decorative/index.ts',
     'hooks/index': 'src/hooks/index.ts',
     index: 'src/index.ts',
@@ -14,7 +15,7 @@ export default defineConfig({
     'primitives/index': 'src/primitives/index.ts',
     'utils/index': 'src/utils/index.ts',
   },
-  external: ['react', 'react-dom', '@base-ui/react', 'lucide-react'],
+  external: ['react', 'react-dom', '@base-ui/react', 'lucide-react', 'recharts', 'shiki'],
   format: ['esm'],
   platform: 'browser',
   sourcemap: true,
