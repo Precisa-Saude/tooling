@@ -9,7 +9,7 @@
  * (they don't publish).
  */
 
-const { readdirSync, readFileSync, writeFileSync } = require('node:fs');
+const { existsSync, readdirSync, readFileSync, writeFileSync } = require('node:fs');
 const { join } = require('node:path');
 
 const PACKAGES_DIR = 'packages';
@@ -19,6 +19,11 @@ const version = rootPkg.version;
 
 if (!version) {
   console.error('No version found in root package.json');
+  process.exit(1);
+}
+
+if (!existsSync(PACKAGES_DIR)) {
+  console.error(`packages directory not found at ./${PACKAGES_DIR}`);
   process.exit(1);
 }
 
@@ -34,8 +39,10 @@ for (const entry of entries) {
   try {
     pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'));
   } catch (err) {
-    console.warn(`Skipped ${entry.name}: no package.json (${err.message})`);
-    continue;
+    // Missing or malformed package.json in a workspace dir is a release-blocker:
+    // releasing with some packages unsynced would publish mismatched versions.
+    console.error(`Failed to read ${pkgJsonPath}: ${err.message}`);
+    process.exit(1);
   }
 
   if (pkg.private) {
