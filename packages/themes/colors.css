@@ -1,0 +1,123 @@
+/**
+ * Palette and shadcn-compatible semantic colors.
+ *
+ * Two layers:
+ * 1. Brand palette (--ps-violet, --ps-mint, --ps-amber, --ps-green) — the
+ *    organization's visual identity. Use for accents, charts, highlights.
+ * 2. Shadcn-compatible semantics (--background, --foreground, --primary,
+ *    --secondary, --muted, --accent, --destructive, --border, --ring, etc.)
+ *    derived from the brand palette. These are the tokens Tailwind/shadcn
+ *    components read.
+ *
+ * All values in OKLCh for perceptually uniform color mixing.
+ * Dark mode under the `.dark` class; add `class="dark"` on <html> to toggle.
+ */
+
+@layer base {
+  :root {
+    /* Brand palette */
+    --ps-violet: oklch(0.67 0.113 285);
+    --ps-mint: oklch(0.9 0.085 181);
+    --ps-green: oklch(0.6 0.17 155);
+    --ps-amber: oklch(0.8 0.123 80);
+
+    /* Surface */
+    --background: oklch(0.94 0.008 61);
+    --foreground: oklch(0.25 0.06 292);
+    --card: oklch(0.96 0.005 61);
+    --card-foreground: oklch(0.25 0.06 292);
+    --popover: oklch(0.96 0.005 61);
+    --popover-foreground: oklch(0.25 0.06 292);
+
+    /* Primary / secondary */
+    --primary: oklch(0.39 0.082 292);
+    --primary-foreground: oklch(0.97 0.005 292);
+    --secondary: oklch(0.89 0.023 65);
+    --secondary-foreground: oklch(0.3 0.07 292);
+
+    /* Neutral */
+    --muted: oklch(0.92 0.012 61);
+    --muted-foreground: oklch(0.55 0.05 285);
+    --accent: oklch(0.92 0.04 285);
+    --accent-foreground: oklch(0.25 0.06 292);
+
+    /* Destructive */
+    --destructive: oklch(0.71 0.157 35);
+    --destructive-foreground: oklch(0.97 0.01 35);
+
+    /* Borders / focus */
+    --border: oklch(0.87 0.018 65);
+    --input: oklch(0.85 0.02 65);
+    --ring: oklch(0.39 0.082 292);
+
+    /* Charts */
+    --chart-1: oklch(0.39 0.082 292);
+    --chart-2: oklch(0.82 0.085 181);
+    --chart-3: oklch(0.67 0.113 285);
+    --chart-4: oklch(0.8 0.123 80);
+    --chart-5: oklch(0.71 0.157 35);
+
+    /* Sidebar (opt-in for app shells that have one) */
+    --sidebar: oklch(0.92 0.01 61);
+    --sidebar-foreground: oklch(0.25 0.06 292);
+    --sidebar-primary: oklch(0.39 0.082 292);
+    --sidebar-primary-foreground: oklch(0.97 0.005 292);
+    --sidebar-accent: oklch(0.89 0.023 65);
+    --sidebar-accent-foreground: oklch(0.25 0.06 292);
+    --sidebar-border: oklch(0.87 0.018 65);
+    --sidebar-ring: oklch(0.39 0.082 292);
+
+    /* Gradient endpoints (convenience) */
+    --gradient-from: var(--primary);
+    --gradient-to: var(--ps-mint);
+  }
+
+  .dark {
+    --ps-violet: oklch(0.72 0.1 285);
+    --ps-mint: oklch(0.82 0.08 181);
+    --ps-green: oklch(0.72 0.14 155);
+    --ps-amber: oklch(0.78 0.11 80);
+
+    --background: oklch(0.22 0.05 292);
+    --foreground: oklch(0.94 0.008 61);
+    --card: oklch(0.26 0.05 292);
+    --card-foreground: oklch(0.94 0.008 61);
+    --popover: oklch(0.26 0.05 292);
+    --popover-foreground: oklch(0.94 0.008 61);
+
+    --primary: oklch(0.9 0.085 181);
+    --primary-foreground: oklch(0.22 0.05 292);
+    --secondary: oklch(0.32 0.04 292);
+    --secondary-foreground: oklch(0.92 0.008 61);
+
+    --muted: oklch(0.3 0.04 292);
+    --muted-foreground: oklch(0.72 0.02 65);
+    --accent: oklch(0.3 0.025 65);
+    --accent-foreground: oklch(0.95 0.005 61);
+
+    --destructive: oklch(0.71 0.157 35);
+    --destructive-foreground: oklch(0.97 0.01 35);
+
+    --border: oklch(0.36 0.04 292);
+    --input: oklch(0.34 0.04 292);
+    --ring: oklch(0.9 0.085 181);
+
+    --chart-1: oklch(0.9 0.085 181);
+    --chart-2: oklch(0.67 0.113 285);
+    --chart-3: oklch(0.8 0.123 80);
+    --chart-4: oklch(0.5 0.1 292);
+    --chart-5: oklch(0.71 0.157 35);
+
+    --sidebar: oklch(0.24 0.05 292);
+    --sidebar-foreground: oklch(0.94 0.008 61);
+    --sidebar-primary: oklch(0.9 0.085 181);
+    --sidebar-primary-foreground: oklch(0.22 0.05 292);
+    --sidebar-accent: oklch(0.3 0.025 65);
+    --sidebar-accent-foreground: oklch(0.95 0.005 61);
+    --sidebar-border: oklch(0.36 0.04 292);
+    --sidebar-ring: oklch(0.9 0.085 181);
+
+    --gradient-from: var(--primary);
+    --gradient-to: var(--ps-violet);
+  }
+}
