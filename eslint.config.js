@@ -11,4 +11,11 @@ export default [
       'packages/eslint-config/react.js',
     ],
   },
+  {
+    // CLI source: console output is the primary interface.
+    files: ['packages/cli/src/**/*.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
 ];
