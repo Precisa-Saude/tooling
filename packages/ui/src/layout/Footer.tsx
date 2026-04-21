@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from 'react';
+import { type ComponentProps, type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { cn } from '../utils/cn.js';
 
@@ -52,11 +52,23 @@ export function Footer({
   version,
   ...props
 }: FooterProps) {
+  const [copied, setCopied] = useState(false);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+    },
+    [],
+  );
+
   const onCopyVersion = version
     ? () => {
-        if (typeof navigator !== 'undefined' && navigator.clipboard) {
-          void navigator.clipboard.writeText(version);
-        }
+        if (typeof navigator === 'undefined' || !navigator.clipboard) return;
+        void navigator.clipboard.writeText(version).then(() => {
+          setCopied(true);
+          copyTimer.current = setTimeout(() => setCopied(false), 1500);
+        });
       }
     : undefined;
 
@@ -123,10 +135,11 @@ export function Footer({
             <button
               type="button"
               onClick={onCopyVersion}
+              aria-label={copied ? 'Version copied to clipboard' : `Copy version v${version}`}
               className="rounded-md px-2 py-0.5 font-mono text-[11px] transition-colors hover:bg-muted"
-              title="Copy version"
+              title={copied ? 'Copied!' : 'Copy version'}
             >
-              v{version}
+              {copied ? 'copied!' : `v${version}`}
             </button>
           ) : null}
           {legal ? <p>{legal}</p> : null}

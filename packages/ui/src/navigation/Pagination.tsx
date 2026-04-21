@@ -123,6 +123,7 @@ export function Pagination({
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
           <span>Rows</span>
           <select
+            aria-label="Rows per page"
             value={pageSize}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
             className={cn(

@@ -146,6 +146,7 @@ function ComboboxSegment({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={segment.searchPlaceholder ?? 'Search…'}
+              aria-label={segment.searchPlaceholder ?? 'Search options'}
               className={cn(
                 'h-8 w-full rounded-sm border border-transparent bg-transparent pl-7 pr-2 text-sm',
                 'outline-none placeholder:text-muted-foreground',
