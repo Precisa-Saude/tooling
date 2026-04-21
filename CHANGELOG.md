@@ -1,3 +1,9 @@
+## [1.0.1](https://github.com/Precisa-Saude/tooling/compare/v1.0.0...v1.0.1) (2026-04-21)
+
+### Bug Fixes
+
+* **ci:** write resolved NPM_TOKEN to ~/.npmrc for pnpm publish ([#10](https://github.com/Precisa-Saude/tooling/issues/10)) ([6d3f5ab](https://github.com/Precisa-Saude/tooling/commit/6d3f5abc2eb23e1c9748242dacb31522defb4855)), closes [#8](https://github.com/Precisa-Saude/tooling/issues/8)
+
 ## 1.0.0 (2026-04-21)
 
 ### Features
