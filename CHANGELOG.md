@@ -1,3 +1,9 @@
+## [1.0.3](https://github.com/Precisa-Saude/tooling/compare/v1.0.2...v1.0.3) (2026-04-21)
+
+### Bug Fixes
+
+* **tsconfig:** address consumer-side plugin and tsbuild gotchas ([#12](https://github.com/Precisa-Saude/tooling/issues/12)) ([f3a5b1d](https://github.com/Precisa-Saude/tooling/commit/f3a5b1df548e20a246f990598d749fbca5985e33))
+
 ## [1.0.2](https://github.com/Precisa-Saude/tooling/compare/v1.0.1...v1.0.2) (2026-04-21)
 
 ### Bug Fixes
