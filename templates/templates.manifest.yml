@@ -1,0 +1,120 @@
+# Manifest for @precisa-saude/cli template renderer.
+# See templates/README.md for schema and placeholder reference.
+
+templates:
+  # ─── Root dotfiles ────────────────────────────────────────────────────────
+  - source: dotfiles/editorconfig
+    target: .editorconfig
+    required_when: always
+    merge_strategy: overwrite
+
+  - source: dotfiles/nvmrc
+    target: .nvmrc
+    required_when: always
+    merge_strategy: overwrite
+
+  - source: dotfiles/npmrc
+    target: .npmrc
+    required_when: always
+    merge_strategy: overwrite
+
+  - source: dotfiles/gitignore
+    target: .gitignore
+    required_when: always
+    merge_strategy: skip_if_exists
+
+  - source: dotfiles/prettierrc
+    target: .prettierrc
+    required_when: always
+    merge_strategy: overwrite
+
+  - source: dotfiles/prettierignore
+    target: .prettierignore
+    required_when: always
+    merge_strategy: overwrite
+
+  - source: dotfiles/renovate.json
+    target: renovate.json
+    required_when: always
+    merge_strategy: overwrite
+
+  # ─── Husky hooks ──────────────────────────────────────────────────────────
+  - source: husky/pre-commit
+    target: .husky/pre-commit
+    required_when: always
+    merge_strategy: overwrite
+    executable: true
+
+  - source: husky/commit-msg
+    target: .husky/commit-msg
+    required_when: always
+    merge_strategy: overwrite
+    executable: true
+
+  - source: husky/pre-push
+    target: .husky/pre-push
+    required_when: always
+    merge_strategy: overwrite
+    executable: true
+
+  # ─── Governance ───────────────────────────────────────────────────────────
+  - source: governance/CODE_OF_CONDUCT.md
+    target: CODE_OF_CONDUCT.md
+    required_when: always
+    merge_strategy: overwrite
+
+  - source: governance/SECURITY.md
+    target: SECURITY.md
+    required_when: always
+    merge_strategy: overwrite
+
+  - source: governance/SUPPORT.md
+    target: SUPPORT.md
+    required_when: always
+    merge_strategy: overwrite
+
+  - source: governance/CITATION.cff
+    target: CITATION.cff
+    required_when: oss
+    merge_strategy: overwrite
+
+  - source: governance/CONTRIBUTING.md
+    target: CONTRIBUTING.md
+    required_when: always
+    merge_strategy: preserve
+
+  - source: governance/CONVENTIONS.md
+    target: CONVENTIONS.md
+    required_when: always
+    merge_strategy: preserve
+
+  # ─── GitHub ───────────────────────────────────────────────────────────────
+  - source: github/PULL_REQUEST_TEMPLATE.md
+    target: .github/PULL_REQUEST_TEMPLATE.md
+    required_when: always
+    merge_strategy: overwrite
+
+  - source: github/ISSUE_TEMPLATE/bug.md
+    target: .github/ISSUE_TEMPLATE/bug.md
+    required_when: always
+    merge_strategy: overwrite
+
+  - source: github/ISSUE_TEMPLATE/feature.md
+    target: .github/ISSUE_TEMPLATE/feature.md
+    required_when: always
+    merge_strategy: overwrite
+
+  - source: github/ISSUE_TEMPLATE/config.yml
+    target: .github/ISSUE_TEMPLATE/config.yml
+    required_when: always
+    merge_strategy: overwrite
+
+  - source: github/workflows/ci.yml
+    target: .github/workflows/ci.yml
+    required_when: always
+    merge_strategy: overwrite
+
+  - source: github/workflows/release.yml
+    target: .github/workflows/release.yml
+    required_when: publishes_to_npm
+    merge_strategy: overwrite
