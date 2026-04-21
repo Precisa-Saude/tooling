@@ -1,6 +1,6 @@
 {
   "name": "@precisa-saude/tsconfig",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Shared TypeScript configs for Precisa Saúde repositories.",
   "keywords": [
     "typescript",
