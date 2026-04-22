@@ -2,10 +2,10 @@ import { Popover as PopoverPrimitive } from '@base-ui/react/popover';
 
 import { cn } from '../utils/cn.js';
 
-export const Popover = PopoverPrimitive.Root;
-export const PopoverTrigger = PopoverPrimitive.Trigger;
-export const PopoverClose = PopoverPrimitive.Close;
-export const PopoverPortal = PopoverPrimitive.Portal;
+export const Popover: typeof PopoverPrimitive.Root = PopoverPrimitive.Root;
+export const PopoverTrigger: typeof PopoverPrimitive.Trigger = PopoverPrimitive.Trigger;
+export const PopoverClose: typeof PopoverPrimitive.Close = PopoverPrimitive.Close;
+export const PopoverPortal: typeof PopoverPrimitive.Portal = PopoverPrimitive.Portal;
 
 export function PopoverContent({
   align = 'center',

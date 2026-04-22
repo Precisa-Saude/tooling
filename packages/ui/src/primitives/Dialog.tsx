@@ -4,10 +4,10 @@ import type { ComponentProps } from 'react';
 
 import { cn } from '../utils/cn.js';
 
-export const Dialog = DialogPrimitive.Root;
-export const DialogTrigger = DialogPrimitive.Trigger;
-export const DialogClose = DialogPrimitive.Close;
-export const DialogPortal = DialogPrimitive.Portal;
+export const Dialog: typeof DialogPrimitive.Root = DialogPrimitive.Root;
+export const DialogTrigger: typeof DialogPrimitive.Trigger = DialogPrimitive.Trigger;
+export const DialogClose: typeof DialogPrimitive.Close = DialogPrimitive.Close;
+export const DialogPortal: typeof DialogPrimitive.Portal = DialogPrimitive.Portal;
 
 export function DialogBackdrop({ className, ...props }: DialogPrimitive.Backdrop.Props) {
   return (

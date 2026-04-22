@@ -3,7 +3,7 @@ import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 
 import { cn } from '../utils/cn.js';
 
-export const Select = SelectPrimitive.Root;
+export const Select: typeof SelectPrimitive.Root = SelectPrimitive.Root;
 
 export function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   return (
