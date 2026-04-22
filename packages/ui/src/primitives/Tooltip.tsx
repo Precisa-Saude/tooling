@@ -3,9 +3,9 @@ import type { ComponentProps, ReactElement, ReactNode } from 'react';
 
 import { cn } from '../utils/cn.js';
 
-export const TooltipProvider = TooltipPrimitive.Provider;
-export const TooltipRoot = TooltipPrimitive.Root;
-export const TooltipTrigger = TooltipPrimitive.Trigger;
+export const TooltipProvider: typeof TooltipPrimitive.Provider = TooltipPrimitive.Provider;
+export const TooltipRoot: typeof TooltipPrimitive.Root = TooltipPrimitive.Root;
+export const TooltipTrigger: typeof TooltipPrimitive.Trigger = TooltipPrimitive.Trigger;
 
 export function TooltipContent({
   align = 'center',

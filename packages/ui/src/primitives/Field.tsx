@@ -2,8 +2,8 @@ import { Field as FieldPrimitive } from '@base-ui/react/field';
 
 import { cn } from '../utils/cn.js';
 
-export const Field = FieldPrimitive.Root;
-export const FieldValidity = FieldPrimitive.Validity;
+export const Field: typeof FieldPrimitive.Root = FieldPrimitive.Root;
+export const FieldValidity: typeof FieldPrimitive.Validity = FieldPrimitive.Validity;
 
 export function FieldLabel({ className, ...props }: FieldPrimitive.Label.Props) {
   return (

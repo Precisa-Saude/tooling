@@ -2,7 +2,7 @@ import { Tabs as TabsPrimitive } from '@base-ui/react/tabs';
 
 import { cn } from '../utils/cn.js';
 
-export const Tabs = TabsPrimitive.Root;
+export const Tabs: typeof TabsPrimitive.Root = TabsPrimitive.Root;
 
 export function TabsList({ className, ...props }: TabsPrimitive.List.Props) {
   return (
@@ -48,4 +48,4 @@ export function TabsPanel({ className, ...props }: TabsPrimitive.Panel.Props) {
   );
 }
 
-export const TabsIndicator = TabsPrimitive.Indicator;
+export const TabsIndicator: typeof TabsPrimitive.Indicator = TabsPrimitive.Indicator;

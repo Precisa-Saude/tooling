@@ -3,7 +3,7 @@ import { ChevronDownIcon } from 'lucide-react';
 
 import { cn } from '../utils/cn.js';
 
-export const Accordion = AccordionPrimitive.Root;
+export const Accordion: typeof AccordionPrimitive.Root = AccordionPrimitive.Root;
 
 export function AccordionItem({ className, ...props }: AccordionPrimitive.Item.Props) {
   return (
