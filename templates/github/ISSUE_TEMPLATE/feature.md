@@ -1,18 +1,18 @@
 ---
-name: Feature request
-about: Propose a new feature or improvement
+name: Solicitação de feature
+about: Proponha uma nova funcionalidade ou melhoria
 title: '[feat] '
 labels: [enhancement]
 ---
 
-## Problem
+## Problema
 
-<!-- What limitation or friction are you hitting? -->
+<!-- Qual limitação ou fricção você está enfrentando? -->
 
-## Proposed solution
+## Solução proposta
 
-<!-- Sketch the API / behavior. Prefer concrete examples over prose. -->
+<!-- Esboce a API / comportamento. Exemplos concretos preferíveis a prosa. -->
 
-## Alternatives considered
+## Alternativas consideradas
 
-<!-- Other approaches you thought about and why you ruled them out. -->
+<!-- Outras abordagens que você considerou e por que descartou. -->

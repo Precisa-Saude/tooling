@@ -1,33 +1,33 @@
 ---
-name: Bug report
-about: Something is broken
+name: Reporte de bug
+about: Algo está quebrado
 title: '[bug] '
 labels: [bug]
 ---
 
-## What happened
+## O que aconteceu
 
-<!-- Short description of the unexpected behavior. -->
+<!-- Descrição curta do comportamento inesperado. -->
 
-## Reproduction
+## Reprodução
 
-<!-- Minimal steps. Include the exact command run, package + version, Node/pnpm versions. -->
+<!-- Passos mínimos. Inclua o comando exato executado, pacote + versão, versões do Node/pnpm. -->
 
 ```bash
-# command(s)
+# comando(s)
 ```
 
-## Expected
+## Esperado
 
-<!-- What you expected to happen. -->
+<!-- O que você esperava que acontecesse. -->
 
-## Environment
+## Ambiente
 
-- Package + version:
+- Pacote + versão:
 - Node: `node --version`
 - pnpm: `pnpm --version`
-- OS: macOS / Linux / Windows
+- SO: macOS / Linux / Windows
 
-## Additional context
+## Contexto adicional
 
-<!-- Stack trace, CI logs, etc. -->
+<!-- Stack trace, logs de CI, etc. -->
