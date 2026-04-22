@@ -17,8 +17,15 @@ import {
 } from '../manifest.js';
 
 export interface NewOptions {
+  conductEmail?: string;
   dryRun: boolean;
+  /** Skip interactive prompts; require --owner/--scopes/--*-email flags. */
+  nonInteractive?: boolean;
+  owner?: string;
   profile: string;
+  /** Comma-separated list, e.g. "core,docs,ci,deps". */
+  scopes?: string;
+  securityEmail?: string;
 }
 
 const PROFILES = {
@@ -66,36 +73,46 @@ export async function runNew(repoName: string, opts: NewOptions): Promise<void> 
   console.log(chalk.dim(`profile: ${opts.profile}${opts.dryRun ? ' (dry-run)' : ''}`));
   console.log(chalk.dim(`target:  ${targetDir}\n`));
 
-  const answers = await prompts(
-    [
-      {
-        initial: 'Precisa-Saude',
-        message: 'GitHub owner (org or user):',
-        name: 'owner',
-        type: 'text',
-      },
-      {
-        initial: 'security@precisa-saude.com.br',
-        message: 'Security contact email:',
-        name: 'securityEmail',
-        type: 'text',
-      },
-      {
-        initial: 'conduct@precisa-saude.com.br',
-        message: 'Code-of-conduct contact email:',
-        name: 'conductEmail',
-        type: 'text',
-      },
-      {
-        initial: 'docs,ci,deps',
-        message: 'Commit scopes (comma-separated):',
-        name: 'commitScopes',
-        separator: ',',
-        type: 'list',
-      },
-    ],
-    { onCancel: () => process.exit(1) },
-  );
+  const answers = opts.nonInteractive
+    ? {
+        commitScopes: (opts.scopes ?? 'docs,ci,deps')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+        conductEmail: opts.conductEmail ?? 'conduct@precisa-saude.com.br',
+        owner: opts.owner ?? 'Precisa-Saude',
+        securityEmail: opts.securityEmail ?? 'security@precisa-saude.com.br',
+      }
+    : await prompts(
+        [
+          {
+            initial: opts.owner ?? 'Precisa-Saude',
+            message: 'GitHub owner (org or user):',
+            name: 'owner',
+            type: 'text',
+          },
+          {
+            initial: opts.securityEmail ?? 'security@precisa-saude.com.br',
+            message: 'Security contact email:',
+            name: 'securityEmail',
+            type: 'text',
+          },
+          {
+            initial: opts.conductEmail ?? 'conduct@precisa-saude.com.br',
+            message: 'Code-of-conduct contact email:',
+            name: 'conductEmail',
+            type: 'text',
+          },
+          {
+            initial: opts.scopes ?? 'docs,ci,deps',
+            message: 'Commit scopes (comma-separated):',
+            name: 'commitScopes',
+            separator: ',',
+            type: 'list',
+          },
+        ],
+        { onCancel: () => process.exit(1) },
+      );
 
   const manifest: PrecisaManifest = {
     ...DEFAULT_MANIFEST_FIELDS,

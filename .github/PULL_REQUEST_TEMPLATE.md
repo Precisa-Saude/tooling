@@ -1,39 +1,48 @@
 <!--
-Thanks for contributing. Please fill out the sections below so reviewers can
-land your change quickly.
+Obrigado por contribuir. Preencha as seções abaixo para que o revisor
+consiga aprovar rápido.
 -->
 
-## Summary
+## Resumo
 
-<!-- One or two sentences on what this changes and why. -->
+<!-- Uma ou duas frases sobre o que muda e por quê. -->
 
-## Type of change
+## Tipo de alteração
 
-- [ ] Bug fix (patch)
-- [ ] Feature (minor)
-- [ ] Breaking change (major — include a `BREAKING CHANGE:` footer on the commit)
-- [ ] Docs / templates / CI only (no version bump expected)
+- [ ] Correção de bug (`fix`, patch)
+- [ ] Nova funcionalidade (`feat`, minor)
+- [ ] Breaking change (major — inclua footer `BREAKING CHANGE:` no commit)
+- [ ] Docs / templates / CI apenas (sem bump de versão)
 
-## Packages touched
+## Pacotes afetados
 
 - [ ] `@precisa-saude/eslint-config`
 - [ ] `@precisa-saude/prettier-config`
 - [ ] `@precisa-saude/tsconfig`
 - [ ] `@precisa-saude/commitlint-config`
+- [ ] `@precisa-saude/agent-instructions`
+- [ ] `@precisa-saude/worktree-cli`
 - [ ] `@precisa-saude/themes`
 - [ ] `@precisa-saude/ui`
 - [ ] `@precisa-saude/cli`
 - [ ] `templates/`
 
-## Consumer impact
+## Impacto nos consumidores
 
-<!-- If this changes a published package's behavior, describe how existing consumers are affected. -->
+<!-- Se isto altera o comportamento de um pacote publicado, descreva como os consumidores existentes são afetados. -->
 
-- [ ] Tested against at least one consumer repo (e.g. via `pnpm link`)
-- [ ] Migration notes added to the package CHANGELOG (for breaking changes)
+- [ ] Testado contra pelo menos um repo consumidor (ex.: `pnpm link`)
+- [ ] Notas de migração no CHANGELOG do pacote (para breaking changes)
+- [ ] Consumidores que precisam rodar `precisa sync` após publicar foram documentados no PR
 
-## Test plan
+## Checklist
 
-<!-- How a reviewer can verify this. -->
+- [ ] Commits em pt-BR seguindo Conventional Commits
+- [ ] `pnpm -r lint typecheck test` passa localmente
+- [ ] Sem segredos ou tokens comitados
+
+## Plano de teste
+
+<!-- Como o revisor verifica a mudança. -->
 
 - [ ]

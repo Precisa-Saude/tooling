@@ -57,6 +57,7 @@ export const DEFAULT_MANIFEST_FIELDS = {
 /** Template gate values — `required_when` in templates.manifest.yml. */
 export type RequiredWhen =
   | 'always'
+  | 'never'
   | 'oss'
   | 'private'
   | 'has_site'
@@ -68,6 +69,8 @@ export function isRequired(when: RequiredWhen, manifest: PrecisaManifest): boole
   switch (when) {
     case 'always':
       return true;
+    case 'never':
+      return false;
     case 'oss':
       return manifest.visibility === 'oss';
     case 'private':
@@ -90,6 +93,11 @@ export function isRequired(when: RequiredWhen, manifest: PrecisaManifest): boole
 export function tokenContext(manifest: PrecisaManifest): Record<string, string> {
   return {
     COMMIT_SCOPES: manifest.commitScopes.join(','),
+    // For human-readable docs (AGENTS.md, README) — backticked list.
+    COMMIT_SCOPES_HUMAN: manifest.commitScopes.map((s) => `\`${s}\``).join(', '),
+    // For `.commitlintrc.cjs` — scope array spelled as JS string literals,
+    // ready to drop inside `[ ... ]`.
+    COMMIT_SCOPES_JSON: manifest.commitScopes.map((s) => `'${s}'`).join(', '),
     CONDUCT_EMAIL: manifest.contactEmails.conduct,
     HAS_PACKAGES: String(manifest.hasPackages),
     HAS_SITE: String(manifest.hasSite),

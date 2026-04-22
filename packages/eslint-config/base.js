@@ -77,6 +77,13 @@ const base = [
       'no-throw-literal': 'error',
       'no-undef': 'off',
 
+      // Size limits — forcing decomposition before files/functions get
+      // unreadable. Thresholds are warns, not errors, so one-off
+      // offenders don't block landing. Data/mapping files should be
+      // ignored via `overrides` or per-repo `ignores`.
+      'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['warn', { max: 300, skipBlankLines: true, skipComments: true }],
+
       'perfectionist/sort-interfaces': [
         'error',
         {

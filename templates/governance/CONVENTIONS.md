@@ -1,37 +1,39 @@
-# Conventions
+# Convenções
 
-## Commit format
+## Formato de commit
 
 [Conventional Commits](https://www.conventionalcommits.org):
 
 ```
-type(scope): short description
+tipo(escopo): descrição curta
 
-optional longer body
+corpo opcional mais longo
 
-BREAKING CHANGE: notes (optional)
+BREAKING CHANGE: notas (opcional)
 ```
 
-**Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`, `build`, `ci`, `revert`
+**Tipos**: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`, `build`, `ci`, `revert`
 
-**Scopes**: declared in `.commitlintrc.cjs`.
+**Escopos**: declarados em `.commitlintrc.cjs`.
 
-**AI attribution**: Do not include `Co-Authored-By: Claude`, `Generated with Claude`, or similar lines. The `commit-msg` hook enforces this.
+**Idioma**: a descrição do commit é escrita em pt-BR; o tipo permanece em inglês (convenção universal do Conventional Commits).
 
-## Code style
+**Atribuição de IA**: não inclua linhas como `Co-Authored-By: Claude`, `Generated with Claude` ou similares. O hook `commit-msg` bloqueia esses padrões.
+
+## Estilo de código
 
 - TypeScript strict mode, `noUncheckedIndexedAccess`
-- ESM modules
-- Prettier-enforced formatting (100 char width, single quotes, semicolons, trailing commas — via `@precisa-saude/prettier-config`)
-- ESLint rules via `@precisa-saude/eslint-config`
-- Imports sorted by `eslint-plugin-simple-import-sort`
-- Interfaces, objects, and JSX props sorted by `eslint-plugin-perfectionist` where applicable
+- Módulos ESM
+- Formatação aplicada via Prettier (100 chars de largura, aspas simples, ponto-e-vírgula, trailing commas — via `@precisa-saude/prettier-config`)
+- Regras ESLint via `@precisa-saude/eslint-config`
+- Imports ordenados por `eslint-plugin-simple-import-sort`
+- Interfaces, objetos e props JSX ordenados por `eslint-plugin-perfectionist` quando aplicável
 
-## Tests
+## Testes
 
-Vitest with an 80% coverage floor (configured per-repo in `vitest.config.ts`).
+Vitest com piso de 80% de cobertura (configurado por repo em `vitest.config.ts`).
 
-## Dependency rules
+## Regras de dependências
 
-- Core/SDK packages avoid runtime dependencies when feasible
-- External dependencies require explicit approval in the PR
+- Pacotes core/SDK evitam dependências runtime quando viável
+- Dependências externas requerem aprovação explícita no PR

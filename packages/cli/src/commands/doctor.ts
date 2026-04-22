@@ -89,17 +89,29 @@ export async function runDoctor(): Promise<void> {
 }
 
 function compareContent(entry: TemplateEntry, current: string, rendered: string): DriftReport {
-  if (entry.merge_strategy === 'preserve') {
-    return {
-      message:
-        current === rendered ? '' : 'Differs from template (preserve strategy — suggestion only)',
-      severity: current === rendered ? 'ok' : 'info',
-      target: entry.target,
-    };
-  }
   if (current === rendered) {
     return { message: '', severity: 'ok', target: entry.target };
   }
+
+  // Non-overwrite strategies don't re-render on sync — treat drift as
+  // informational, not a warning. Makes the doctor output scannable:
+  // warnings are the files sync WOULD change; infos are files where
+  // drift is intentional (customized scaffold, preserved docs).
+  if (entry.merge_strategy === 'preserve') {
+    return {
+      message: 'Differs from template (preserve strategy — suggestion only)',
+      severity: 'info',
+      target: entry.target,
+    };
+  }
+  if (entry.merge_strategy === 'skip_if_exists') {
+    return {
+      message: 'Differs from template (scaffold-only; sync will not overwrite)',
+      severity: 'info',
+      target: entry.target,
+    };
+  }
+
   return {
     message: 'Differs from template (run `precisa sync` to update)',
     severity: 'warning',

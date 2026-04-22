@@ -1,14 +1,14 @@
-# Support
+# Suporte
 
-## Getting help
+## Como obter ajuda
 
-- **Report bugs**: [GitHub Issues](https://github.com/{{REPO_SLUG}}/issues)
-- **Request features**: [GitHub Issues](https://github.com/{{REPO_SLUG}}/issues)
-- **Questions and discussions**: [GitHub Discussions](https://github.com/{{REPO_SLUG}}/discussions)
+- **Reportar bugs**: [GitHub Issues](https://github.com/{{REPO_SLUG}}/issues)
+- **Solicitar features**: [GitHub Issues](https://github.com/{{REPO_SLUG}}/issues)
+- **Perguntas e discussões**: [GitHub Discussions](https://github.com/{{REPO_SLUG}}/discussions)
 
-## Before opening an issue
+## Antes de abrir uma issue
 
-1. Search existing issues to avoid duplicates
-2. Include a minimal reproducible example
-3. Specify the package and version
-4. Include Node/pnpm versions and the OS you're on
+1. Pesquise issues existentes para evitar duplicatas
+2. Inclua um exemplo mínimo reproduzível
+3. Especifique o pacote e a versão
+4. Inclua versões de Node/pnpm e o sistema operacional
