@@ -1,6 +1,6 @@
 {
   "name": "@precisa-saude/ui",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Shared React components and hooks for Precisa Saúde sites and apps.",
   "keywords": [
     "react",
