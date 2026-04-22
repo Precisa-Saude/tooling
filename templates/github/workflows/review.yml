@@ -1,18 +1,22 @@
 name: Code Review
 
-# Tries providers in order (Anthropic → OpenAI) and uses the first one that
-# returns a 200. Any non-200 from a provider triggers fallback to the next.
-# If all configured providers fail (or none are configured), the workflow
-# exits without posting a review and without emitting a round marker, so
-# the next PR activity retries fresh.
+# Reusable workflow chamado pelo ci.yml para rodar o review automatizado.
+# Tenta providers em ordem (Anthropic → OpenAI → GitHub Models) e usa o
+# primeiro que retorna 200. Qualquer não-200 dispara fallback para o
+# próximo. GitHub Models é o último degrau: usa o GITHUB_TOKEN built-in
+# + permissão `models: read`, então funciona sem nenhum segredo externo
+# — repos que não configuram ANTHROPIC_API_KEY nem OPENAI_API_KEY ainda
+# têm review automatizado. Se todos falham (ou nenhum está configurado),
+# sai sem postar review e sem emitir marker de round, de modo que a
+# próxima atividade no PR retenta fresco.
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-
-concurrency:
-  group: review-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  workflow_call:
+    inputs:
+      pr_number:
+        description: 'PR number to review'
+        type: number
+        required: true
 
 jobs:
   check-review-status:
@@ -26,7 +30,7 @@ jobs:
       should_run: ${{ steps.check.outputs.should_run }}
       review_round: ${{ steps.check.outputs.review_round }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Decide whether to run
         id: check
@@ -34,10 +38,12 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const prNumber = context.issue.number;
+            const prNumber = ${{ inputs.pr_number }};
 
-            // Skip docs/config-only PRs
-            const { data: files } = await github.rest.pulls.listFiles({
+            // Paginamos listFiles porque em PRs grandes o .tsx/.ts real pode
+            // cair em página 2+ e a detecção de "código mudou" dava falso
+            // negativo, pulando o review.
+            const files = await github.paginate(github.rest.pulls.listFiles, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: prNumber,
@@ -78,12 +84,18 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      # `models: read` lets this job call GitHub Models via the built-in
+      # GITHUB_TOKEN — no external API key needed for the fallback
+      # provider. Repos that don't configure ANTHROPIC_API_KEY or
+      # OPENAI_API_KEY still get a review via GitHub Models.
+      models: read
     env:
       ANTHROPIC_MODEL: claude-haiku-4-5-20251001
       OPENAI_MODEL: gpt-4o-mini
+      GITHUB_MODELS_MODEL: openai/gpt-4o-mini
       MAX_DIFF_SIZE: '150000'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -92,8 +104,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REVIEW_ROUND: ${{ needs.check-review-status.outputs.review_round }}
+          PR_NUMBER: ${{ inputs.pr_number }}
         run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
           HEAD_SHA=$(gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid)
           echo "head_sha=$HEAD_SHA" >> $GITHUB_OUTPUT
           echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
@@ -120,6 +132,9 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # GitHub Models uses the built-in GITHUB_TOKEN; `models: read`
+          # on the job permissions is what actually authorizes the call.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DIFF_TRUNCATED: ${{ steps.pr.outputs.diff_truncated }}
           REVIEW_ROUND: ${{ needs.check-review-status.outputs.review_round }}
         run: |
@@ -163,8 +178,9 @@ jobs:
             '- If no issues, return an empty feedback array.',
           ].join('\n');
 
-          // Per-1M-token USD pricing. Update when providers change rates.
-          // Missing entries silently skip cost display (tokens still shown).
+          // Pricing por 1M tokens USD. Atualizar quando providers mudarem rates.
+          // Entradas faltando silenciosamente pulam exibição de custo (tokens
+          // ainda são mostrados).
           const PRICING = {
             'claude-haiku-4-5-20251001': { in: 1.00, out: 5.00 },
             'claude-sonnet-4-6': { in: 3.00, out: 15.00 },
@@ -235,10 +251,46 @@ jobs:
               }),
               extractError: (r) => r?.error?.message ?? 'see workflow logs',
             },
+            // GitHub Models — OpenAI-compatible API authenticated via the
+            // built-in GITHUB_TOKEN + `models: read` permission. No
+            // external API key needed, so this is the fallback when
+            // neither Anthropic nor OpenAI secrets are configured.
+            // Rate limits apply per-repo; the models catalog lists what's
+            // available. `openai/gpt-4o-mini` is a safe default.
+            'github-models': {
+              label: 'GitHub Models',
+              envKey: 'GITHUB_TOKEN',
+              modelEnv: 'GITHUB_MODELS_MODEL',
+              defaultModel: 'openai/gpt-4o-mini',
+              build: (model, key) => ({
+                url: 'https://models.github.ai/inference/chat/completions',
+                headers: {
+                  'content-type': 'application/json',
+                  Authorization: `Bearer ${key}`,
+                },
+                body: JSON.stringify({
+                  model,
+                  max_tokens: 8192,
+                  messages: [
+                    { role: 'system', content: system },
+                    { role: 'user', content: user },
+                  ],
+                  response_format: { type: 'json_object' },
+                }),
+              }),
+              extractText: (r) => r?.choices?.[0]?.message?.content ?? '',
+              extractUsage: (r) => ({
+                prompt_tokens: r?.usage?.prompt_tokens ?? 0,
+                completion_tokens: r?.usage?.completion_tokens ?? 0,
+              }),
+              extractError: (r) => r?.error?.message ?? 'see workflow logs',
+            },
           };
 
-          // Provider order: try Anthropic, fall back to OpenAI.
-          const order = ['anthropic', 'openai'];
+          // Provider order: prefer Anthropic (best output quality), then
+          // OpenAI, then GitHub Models as a keyless fallback. Each
+          // provider is skipped if its auth env var isn't set.
+          const order = ['anthropic', 'openai', 'github-models'];
 
           const setOutput = (k, v) => {
             fs.appendFileSync(process.env.GITHUB_OUTPUT, `${k}<<EOF\n${String(v)}\nEOF\n`);
@@ -325,7 +377,6 @@ jobs:
             setOutput('completion_tokens', String(completionTokens));
             setOutput('cost_usd', cost == null ? '' : cost.toFixed(4));
 
-            // Emit fallback details to the workflow log (not the PR comment).
             const failed = attempts.filter((a) => !a.ok && !a.skip);
             const fellBack = failed.length > 0;
             setOutput('fell_back', fellBack ? 'true' : 'false');
@@ -363,7 +414,8 @@ jobs:
               : '';
             const fallbackBadge = fellBack ? ' (fallback)' : '';
 
-            // Failure paths — no round marker, so the next push retries fresh.
+            // Caminhos de falha — sem marker, de modo que o próximo push
+            // retenta como Round 1.
             if (status !== 'ok') {
               const note = status === 'skipped'
                 ? `Review skipped — ${errorReason}. No round marker emitted; the next PR activity will retry as Round 1.`

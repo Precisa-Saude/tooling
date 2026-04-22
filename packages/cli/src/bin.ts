@@ -17,9 +17,35 @@ program
   .description('Scaffold a new repository from the shared templates.')
   .option('--profile <profile>', 'preset: oss-library | oss-site | private-app', 'oss-library')
   .option('--dry-run', 'print what would be written without touching disk', false)
-  .action(async (repoName: string, opts: { profile: string; dryRun: boolean }) => {
-    await runNew(repoName, opts);
-  });
+  .option('--non-interactive', 'skip prompts; use --owner/--scopes/etc. flags instead', false)
+  .option('--owner <org>', 'GitHub owner (org or user)', 'Precisa-Saude')
+  .option(
+    '--scopes <csv>',
+    'Comma-separated commit scopes (e.g. "core,docs,ci,deps")',
+    'docs,ci,deps',
+  )
+  .option('--security-email <email>', 'Security contact email', 'security@precisa-saude.com.br')
+  .option(
+    '--conduct-email <email>',
+    'Code-of-conduct contact email',
+    'conduct@precisa-saude.com.br',
+  )
+  .action(
+    async (
+      repoName: string,
+      opts: {
+        profile: string;
+        dryRun: boolean;
+        nonInteractive: boolean;
+        owner: string;
+        scopes: string;
+        securityEmail: string;
+        conductEmail: string;
+      },
+    ) => {
+      await runNew(repoName, opts);
+    },
+  );
 
 program
   .command('sync')

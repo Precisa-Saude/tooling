@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "name": "tooling",
+  "owner": "Precisa-Saude",
+  "visibility": "oss",
+  "hasSite": false,
+  "hasPackages": true,
+  "publishesToNpm": false,
+  "commitScopes": [
+    "agent-instructions",
+    "cli",
+    "commitlint-config",
+    "eslint-config",
+    "prettier-config",
+    "themes",
+    "tsconfig",
+    "ui",
+    "worktree-cli",
+    "templates",
+    "docs",
+    "ci",
+    "deps",
+    "lint",
+    "config",
+    "release"
+  ],
+  "contactEmails": {
+    "security": "security@precisa-saude.com.br",
+    "conduct": "conduct@precisa-saude.com.br"
+  },
+  "nodeVersion": "22",
+  "pnpmVersion": "9.15.9"
+}

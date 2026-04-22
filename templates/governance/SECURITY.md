@@ -1,22 +1,22 @@
-# Security Policy
+# Política de Segurança
 
-## Reporting a Vulnerability
+## Reportar uma Vulnerabilidade
 
-If you discover a security vulnerability in this project, please report it responsibly.
+Se você descobrir uma vulnerabilidade de segurança neste projeto, por favor reporte de forma responsável.
 
-**Do not open a public GitHub issue.**
+**Não abra uma issue pública no GitHub.**
 
-Email: **{{SECURITY_EMAIL}}**
+Envie um e-mail para: **{{SECURITY_EMAIL}}**
 
-Include:
+Inclua:
 
-- Description of the vulnerability
-- Steps to reproduce
-- Potential impact
-- Suggested fix (if any)
+- Descrição da vulnerabilidade
+- Passos para reproduzir
+- Impacto potencial
+- Correção sugerida (se houver)
 
-We will acknowledge receipt within 48 hours and provide a timeline for resolution.
+Confirmaremos o recebimento em até 48 horas e forneceremos um cronograma para resolução.
 
-## Disclosure
+## Divulgação
 
-Disclosure is coordinated privately. Fixes are released in the affected package(s) and noted in the CHANGELOG.
+A divulgação é coordenada de forma privada. Correções são lançadas no(s) pacote(s) afetado(s) e registradas no CHANGELOG.

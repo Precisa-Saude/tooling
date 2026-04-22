@@ -1,18 +1,18 @@
-<!-- Thanks for contributing. Please fill out the sections below. -->
+<!-- Obrigado pela contribuição. Por favor preencha as seções abaixo. -->
 
-## Summary
+## Resumo
 
-<!-- One or two sentences on what this changes and why. -->
+<!-- Uma ou duas frases sobre o que muda e por quê. -->
 
-## Type of change
+## Tipo de alteração
 
-- [ ] Bug fix (patch)
-- [ ] Feature (minor)
-- [ ] Breaking change (major — include a `BREAKING CHANGE:` footer on the commit)
-- [ ] Docs / CI only (no version bump expected)
+- [ ] Correção de bug (`fix` — patch)
+- [ ] Nova funcionalidade (`feat` — minor)
+- [ ] Breaking change (major — inclua um footer `BREAKING CHANGE:` no commit)
+- [ ] Apenas docs / CI (sem bump de versão esperado)
 
-## Test plan
+## Plano de teste
 
-<!-- How a reviewer can verify this. -->
+<!-- Como um revisor pode verificar essa mudança. -->
 
 - [ ]

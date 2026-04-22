@@ -59,13 +59,6 @@ Versioning rules (see `.releaserc.cjs`):
 | `BREAKING CHANGE:` in footer                         | major |
 | `docs` / `style` / `test` / `ci` / `chore` / `build` | none  |
 
-### Required secrets
-
-Release requires these repository (or organization) secrets:
-
-- `NPM_TOKEN` — classic or granular automation token with publish rights on the `@precisa-saude/*` scope
-- `GITHUB_TOKEN` — provided automatically by GitHub Actions
-
 ### Skipping a release
 
 Include `[skip ci]` anywhere in the commit body to skip the release workflow entirely. Use sparingly — the standard flow is to let every merge pass through.
@@ -75,7 +68,7 @@ Include `[skip ci]` anywhere in the commit body to skip the release workflow ent
 To see what semantic-release would do without touching anything:
 
 ```bash
-GITHUB_TOKEN=dummy NPM_TOKEN=dummy pnpm exec semantic-release --dry-run --no-ci
+pnpm exec semantic-release --dry-run --no-ci
 ```
 
 This runs the commit analysis and prints the intended version / changelog without writing to the registry or the repo.

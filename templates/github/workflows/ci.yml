@@ -1,4 +1,20 @@
-name: CI
+name: CI/CD
+
+# Canonical CI/CD orchestrator — mirrors platform's split-workflow shape.
+# Each concern lives in its own reusable workflow under `.github/workflows/`:
+#
+#   _checks.yml       — parallel CI checks (lint, typecheck, format, build, test)
+#   _release.yml      — semantic-release with packages_changed guard
+#   _publish.yml      — npm publish pinned to release_sha
+#   _deploy-site.yml  — Cloudflare Pages deploy + Slack notify (repos with sites)
+#   review.yml        — automated Anthropic → OpenAI code review
+#   publish-tag.yml   — manual recovery (workflow_dispatch)
+#
+# This orchestrator wires the pieces together. Each repo adapts:
+#   - Which reusable workflows to call (comment out what doesn't apply)
+#   - The publish `packages` list
+#   - The site `project_name` and `site_filter`
+#   - Extra repo-specific workflows (e.g. fhir's publish-ig.yml)
 
 on:
   push:
@@ -7,38 +23,58 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  deployments: write
+  id-token: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    name: build + typecheck + lint + test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+  # ── CI checks (every PR and push) ──────────────────────────────
+  checks:
+    uses: ./.github/workflows/_checks.yml
+    secrets: inherit
 
-      - uses: pnpm/action-setup@v4
+  # ── Automated code review (PR only, after checks) ──────────────
+  review:
+    needs: checks
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/review.yml
+    with:
+      pr_number: ${{ github.event.pull_request.number }}
+    secrets: inherit
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '{{NODE_VERSION}}'
-          cache: pnpm
+  # ── Release (main only, guarded on package changes) ────────────
+  release:
+    needs: checks
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/_release.yml
+    secrets: inherit
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+  # ── Publish to npm (when release created a new version) ────────
+  publish:
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    uses: ./.github/workflows/_publish.yml
+    with:
+      release_sha: ${{ needs.release.outputs.release_sha }}
+      # Newline-separated list of package directories. One per line.
+      packages: |
+        packages/core
+        packages/calculators
+    secrets: inherit
 
-      - name: Build
-        run: pnpm -r build
-
-      - name: Typecheck
-        run: pnpm -r typecheck
-
-      - name: Lint
-        run: pnpm -r lint
-
-      - name: Format check
-        run: pnpm format:check
-
-      - name: Test
-        run: pnpm -r test
+  # ── Deploy site (repos with a site — remove if not applicable) ──
+  deploy-site:
+    needs: checks
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/_deploy-site.yml
+    with:
+      project_name: '{{PROJECT_NAME}}'
+      site_filter: '@{{SITE_FILTER}}'
+    secrets: inherit

@@ -2,6 +2,40 @@
 # See templates/README.md for schema and placeholder reference.
 
 templates:
+  # ─── Package manifest ─────────────────────────────────────────────────────
+  # The package.json is the single most critical bootstrap file — without
+  # it, `pnpm install` fails and nothing else works.
+  - source: package.json
+    target: package.json
+    required_when: always
+    merge_strategy: skip_if_exists
+
+  - source: pnpm-workspace.yaml
+    target: pnpm-workspace.yaml
+    required_when: always
+    merge_strategy: skip_if_exists
+
+  - source: turbo.json
+    target: turbo.json
+    required_when: always
+    merge_strategy: overwrite
+
+  # ─── TypeScript / ESLint / Prettier / Commitlint configs ──────────────────
+  - source: tsconfig.json
+    target: tsconfig.json
+    required_when: always
+    merge_strategy: overwrite
+
+  - source: eslint.config.js
+    target: eslint.config.js
+    required_when: always
+    merge_strategy: overwrite
+
+  - source: commitlintrc.cjs
+    target: .commitlintrc.cjs
+    required_when: always
+    merge_strategy: overwrite
+
   # ─── Root dotfiles ────────────────────────────────────────────────────────
   - source: dotfiles/editorconfig
     target: .editorconfig
@@ -57,6 +91,56 @@ templates:
     merge_strategy: overwrite
     executable: true
 
+  # ─── Agent instructions ───────────────────────────────────────────────────
+  # AGENTS.md is the repo-specific addendum; the shared base lives in
+  # the @precisa-saude/agent-instructions npm package and is loaded via
+  # CLAUDE.md's @-imports at agent startup.
+  - source: AGENTS.md
+    target: AGENTS.md
+    required_when: always
+    merge_strategy: skip_if_exists
+
+  - source: CLAUDE.md
+    target: CLAUDE.md
+    required_when: always
+    merge_strategy: overwrite
+
+  # ─── Scripts ──────────────────────────────────────────────────────────────
+  - source: scripts/worktree.sh
+    target: scripts/worktree.sh
+    required_when: always
+    merge_strategy: overwrite
+    executable: true
+
+  # ─── Claude Code sub-agents ───────────────────────────────────────────────
+  # Generic agents extracted from platform's .claude/agents/. Repo-specific
+  # agents (iOS QA, UI polish, perf audit for web) stay in the consumer
+  # repo's own .claude/agents/ and are NOT synced by precisa sync.
+  - source: .claude/agents/debugger.md
+    target: .claude/agents/debugger.md
+    required_when: always
+    merge_strategy: overwrite
+
+  - source: .claude/agents/docs-sync.md
+    target: .claude/agents/docs-sync.md
+    required_when: always
+    merge_strategy: overwrite
+
+  - source: .claude/agents/pr-review-responder.md
+    target: .claude/agents/pr-review-responder.md
+    required_when: always
+    merge_strategy: overwrite
+
+  - source: .claude/agents/pre-commit-check.md
+    target: .claude/agents/pre-commit-check.md
+    required_when: always
+    merge_strategy: overwrite
+
+  - source: .claude/agents/refactor-scout.md
+    target: .claude/agents/refactor-scout.md
+    required_when: always
+    merge_strategy: overwrite
+
   # ─── Governance ───────────────────────────────────────────────────────────
   - source: governance/CODE_OF_CONDUCT.md
     target: CODE_OF_CONDUCT.md
@@ -94,13 +178,13 @@ templates:
     required_when: always
     merge_strategy: overwrite
 
-  - source: github/ISSUE_TEMPLATE/bug.md
-    target: .github/ISSUE_TEMPLATE/bug.md
+  - source: github/ISSUE_TEMPLATE/bug_report.md
+    target: .github/ISSUE_TEMPLATE/bug_report.md
     required_when: always
     merge_strategy: overwrite
 
-  - source: github/ISSUE_TEMPLATE/feature.md
-    target: .github/ISSUE_TEMPLATE/feature.md
+  - source: github/ISSUE_TEMPLATE/feature_request.md
+    target: .github/ISSUE_TEMPLATE/feature_request.md
     required_when: always
     merge_strategy: overwrite
 
@@ -109,17 +193,53 @@ templates:
     required_when: always
     merge_strategy: overwrite
 
+  # ─── Workflows (canonical split pattern) ──────────────────────────────────
+  # Orchestrator + reusable workflows. Each reusable is `workflow_call`-only;
+  # the orchestrator (`ci.yml`) wires them together.
   - source: github/workflows/ci.yml
     target: .github/workflows/ci.yml
     required_when: always
     merge_strategy: overwrite
 
-  - source: github/workflows/release.yml
-    target: .github/workflows/release.yml
-    required_when: publishes_to_npm
+  - source: github/workflows/_checks.yml
+    target: .github/workflows/_checks.yml
+    required_when: always
     merge_strategy: overwrite
 
   - source: github/workflows/review.yml
     target: .github/workflows/review.yml
     required_when: always
+    merge_strategy: overwrite
+
+  - source: github/workflows/_release.yml
+    target: .github/workflows/_release.yml
+    required_when: publishes_to_npm
+    merge_strategy: overwrite
+
+  - source: github/workflows/_publish.yml
+    target: .github/workflows/_publish.yml
+    required_when: publishes_to_npm
+    merge_strategy: overwrite
+
+  - source: github/workflows/publish-tag.yml
+    target: .github/workflows/publish-tag.yml
+    required_when: publishes_to_npm
+    merge_strategy: overwrite
+
+  - source: github/workflows/_deploy-site.yml
+    target: .github/workflows/_deploy-site.yml
+    required_when: has_site
+    merge_strategy: overwrite
+
+  - source: github/workflows/doctor.yml
+    target: .github/workflows/doctor.yml
+    required_when: always
+    merge_strategy: overwrite
+
+  # Standalone release workflow (alternative to _release+_publish split)
+  # for tooling-style monorepos. Gated off by default; consumers choose
+  # one or the other.
+  - source: github/workflows/release.yml
+    target: .github/workflows/release.yml
+    required_when: never
     merge_strategy: overwrite

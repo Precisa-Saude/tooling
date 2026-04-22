@@ -1,8 +1,8 @@
-# Contributing
+# Contribuindo
 
-Thanks for considering a contribution to `{{REPO_NAME}}`.
+Obrigado por considerar contribuir com `{{REPO_NAME}}`.
 
-## Development
+## Desenvolvimento
 
 ```bash
 pnpm install
@@ -12,21 +12,21 @@ pnpm -r test
 pnpm -r lint
 ```
 
-Node {{NODE_VERSION}}+ and pnpm {{PNPM_VERSION}}+ are required (see `.nvmrc` and the `packageManager` field).
+Node {{NODE_VERSION}}+ e pnpm {{PNPM_VERSION}}+ são obrigatórios (veja `.nvmrc` e o campo `packageManager`).
 
-## Workflow
+## Fluxo
 
-1. Fork (or branch) from `main`
-2. Open a PR — direct pushes to `main` are not allowed
-3. CI must be green
-4. A reviewer approves and merges via GitHub
+1. Faça fork (ou branch) a partir de `main`
+2. Abra um PR — pushes diretos para `main` não são permitidos
+3. CI precisa estar verde
+4. Um revisor aprova e mescla via GitHub
 
-Commits follow [Conventional Commits](https://www.conventionalcommits.org). Allowed scopes for this repo are configured in `.commitlintrc.cjs`.
+Commits seguem [Conventional Commits](https://www.conventionalcommits.org). Os escopos válidos para este repo estão configurados em `.commitlintrc.cjs`. Mensagens de commit em pt-BR (descrição); o `tipo` (`feat`, `fix`, etc.) permanece em inglês por convenção universal.
 
-## Dependency changes
+## Mudanças de dependências
 
-Ask before adding runtime or peer dependencies. In the PR description explain: what the package does, why it's needed, and whether an existing dependency could serve the purpose.
+Pergunte antes de adicionar dependências runtime ou peer. Na descrição do PR explique: o que o pacote faz, por que é necessário e se uma dependência existente poderia atender ao propósito.
 
-## Signing
+## Assinatura
 
-All commits should be GPG-signed. The `commit-msg` hook blocks AI-attribution footers (`Co-Authored-By: Claude` and similar).
+Todos os commits devem ser assinados via GPG. O hook `commit-msg` bloqueia atribuições de IA (`Co-Authored-By: Claude` e similares).
