@@ -1,0 +1,4 @@
+{
+  "extends": "@precisa-saude/tsconfig/library",
+  "exclude": ["node_modules", "dist"]
+}
