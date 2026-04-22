@@ -29,6 +29,10 @@ permissions:
   pull-requests: write
   deployments: write
   id-token: write
+  # `models: read` é necessário porque review.yml (reusable) pode chamar
+  # GitHub Models via GITHUB_TOKEN no fallback. Workflows reusáveis só
+  # conseguem pedir permissões que o caller também concede.
+  models: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
