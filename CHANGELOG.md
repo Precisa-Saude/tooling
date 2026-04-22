@@ -1,3 +1,13 @@
+## [1.2.0](https://github.com/Precisa-Saude/tooling/compare/v1.1.2...v1.2.0) (2026-04-22)
+
+### Features
+
+* **eslint:** expandir override de tests pra cobrir benchmarks e test/ dirs ([4b0cf9e](https://github.com/Precisa-Saude/tooling/commit/4b0cf9e4c6bc2ec703a41bcf50675063726460c5))
+
+### Chores
+
+* **eslint:** mover max-lines off pra override compartilhado de testes ([8d91d68](https://github.com/Precisa-Saude/tooling/commit/8d91d68506c7a0a77cc07804a969d4692f8fe23d))
+
 ## [1.1.2](https://github.com/Precisa-Saude/tooling/compare/v1.1.1...v1.1.2) (2026-04-22)
 
 ### Bug Fixes
