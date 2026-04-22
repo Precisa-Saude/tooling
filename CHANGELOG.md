@@ -1,3 +1,9 @@
+## [1.0.4](https://github.com/Precisa-Saude/tooling/compare/v1.0.3...v1.0.4) (2026-04-22)
+
+### Bug Fixes
+
+* **ui:** annotate bare primitive re-exports with typeof ([#13](https://github.com/Precisa-Saude/tooling/issues/13)) ([0bb0d1c](https://github.com/Precisa-Saude/tooling/commit/0bb0d1c818d17106f4f9a2d132ff1b81c55618a8))
+
 ## [1.0.3](https://github.com/Precisa-Saude/tooling/compare/v1.0.2...v1.0.3) (2026-04-21)
 
 ### Bug Fixes
