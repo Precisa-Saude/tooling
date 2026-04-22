@@ -1,8 +1,19 @@
 name: Release
 
+# Release standalone para repos que publicam pacotes SEM site associado
+# (ex.: tooling). Repos que têm site costumam integrar release+publish no
+# ci.yml — veja ci.yml do template.
+
 on:
   push:
     branches: [main]
+  # Weekly cadence — picks up any docs/CI/chore commits that semantic-
+  # release normally wouldn't promote. Ensures consumers stay within
+  # one minor of the current HEAD even during low-commit weeks.
+  # semantic-release is a no-op when there are no releasable commits,
+  # so this is safe to run unconditionally.
+  schedule:
+    - cron: '0 9 * * 1'
   workflow_dispatch:
 
 concurrency:
@@ -13,23 +24,25 @@ jobs:
   release:
     name: semantic-release
     runs-on: ubuntu-latest
+    # `id-token: write` is for Sigstore attestations (`--provenance`),
+    # not for npm auth. npm auth uses the `NPM_TOKEN` org-secret.
     permissions:
       contents: write
       issues: write
       pull-requests: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
-          cache: pnpm
+          cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
@@ -39,11 +52,12 @@ jobs:
         run: pnpm -r build
 
       - name: Configure npm auth
-        # actions/setup-node writes ~/.npmrc with a ${NODE_AUTH_TOKEN} placeholder
-        # that `npm` interpolates at publish time, but `pnpm publish` (used by our
-        # semantic-release `publishCmd`) doesn't always expand it. Write the
-        # resolved token directly so pnpm reads it unambiguously. Lives in $HOME
-        # so it doesn't pollute the repo working tree.
+        # `actions/setup-node` writes `~/.npmrc` with a literal
+        # `${NODE_AUTH_TOKEN}` placeholder that `npm` expands at publish
+        # time, but `pnpm publish` (used by semantic-release's
+        # `publishCmd`) doesn't always expand it. Write the resolved
+        # token directly so pnpm reads it unambiguously. Lives in $HOME
+        # so it doesn't pollute the working tree.
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
