@@ -1,0 +1,29 @@
+{
+  "name": "@precisa-saude/agent-instructions",
+  "version": "1.0.4",
+  "description": "Shared agent instructions (AGENTS.md) for Precisa Saúde repositories — the single source of truth for cross-repo conventions, consumed by Claude Code and other agent-aware editors via @path imports.",
+  "keywords": [
+    "agents",
+    "agents-md",
+    "claude",
+    "claude-code",
+    "precisa-saude"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Precisa-Saude/tooling.git",
+    "directory": "packages/agent-instructions"
+  },
+  "license": "Apache-2.0",
+  "author": "Precisa Saúde",
+  "files": [
+    "AGENTS.md",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
