@@ -107,6 +107,11 @@ const base = [
       '@typescript-eslint/no-explicit-any': 'off',
       'no-console': 'off',
       'perfectionist/sort-objects': 'off',
+      // Testes data-driven (tabelas de casos, fixtures inline) legitimamente
+      // passam do limite de linhas; fragmentar esconderia o tamanho real
+      // dos cenários testados em vez de melhorar manutenibilidade.
+      'max-lines': 'off',
+      'max-lines-per-function': 'off',
     },
   },
 
