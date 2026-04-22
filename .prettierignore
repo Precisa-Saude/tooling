@@ -5,3 +5,8 @@ coverage
 .turbo
 pnpm-lock.yaml
 CHANGELOG.md
+
+# Template files with {{TOKEN}} placeholders that aren't valid JS/JSON
+# until rendered by the CLI — prettier parses them strictly and chokes.
+templates/commitlintrc.cjs
+templates/package.json
