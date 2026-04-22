@@ -1,3 +1,9 @@
+## [1.1.0](https://github.com/Precisa-Saude/tooling/compare/v1.0.4...v1.1.0) (2026-04-22)
+
+### Features
+
+* consolidação do tooling — novos pacotes, workflows canônicos, configs unificados ([9415943](https://github.com/Precisa-Saude/tooling/commit/9415943aba540c009c612c6bcc44fa365084f480))
+
 ## [1.0.4](https://github.com/Precisa-Saude/tooling/compare/v1.0.3...v1.0.4) (2026-04-22)
 
 ### Bug Fixes
