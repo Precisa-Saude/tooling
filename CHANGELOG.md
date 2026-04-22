@@ -1,3 +1,9 @@
+## [1.1.1](https://github.com/Precisa-Saude/tooling/compare/v1.1.0...v1.1.1) (2026-04-22)
+
+### Bug Fixes
+
+* **ci:** concede models: read no caller para review.yml poder pedir ([4fa67b3](https://github.com/Precisa-Saude/tooling/commit/4fa67b392f7e7e7104ba3d3b529e60f3854f4363))
+
 ## [1.1.0](https://github.com/Precisa-Saude/tooling/compare/v1.0.4...v1.1.0) (2026-04-22)
 
 ### Features
