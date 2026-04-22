@@ -1,3 +1,9 @@
+## [1.1.2](https://github.com/Precisa-Saude/tooling/compare/v1.1.1...v1.1.2) (2026-04-22)
+
+### Bug Fixes
+
+* **templates:** concede contents: write no caller para _release.yml ([9783ecf](https://github.com/Precisa-Saude/tooling/commit/9783ecfbc3d3badc0d9556b911e873715215be8e)), closes [#16](https://github.com/Precisa-Saude/tooling/issues/16) [#7](https://github.com/Precisa-Saude/tooling/issues/7)
+
 ## [1.1.1](https://github.com/Precisa-Saude/tooling/compare/v1.1.0...v1.1.1) (2026-04-22)
 
 ### Bug Fixes
