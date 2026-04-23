@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
@@ -25,11 +25,17 @@ export async function setup({ branch, cfg, repoRoot }: SetupOptions): Promise<vo
 
   console.log(chalk.bold(`==> Creating worktree for '${branch}' at ${wtPath}...`));
 
-  // Fetch origin/main from the main worktree; the new worktree branches from it.
+  // Fetch origin/main from the main worktree; a fresh worktree branches from it.
   execFileSync('git', ['-C', repoRoot, 'fetch', 'origin', 'main'], { stdio: 'inherit' });
-  execFileSync('git', ['-C', repoRoot, 'worktree', 'add', '-b', branch, wtPath, 'origin/main'], {
-    stdio: 'inherit',
-  });
+
+  // If the branch already exists (local or remote-tracking), check it out
+  // into the new worktree instead of creating a fresh branch — otherwise
+  // `git worktree add -b` errors out on the duplicate.
+  const reuseExisting = branchExists(repoRoot, branch);
+  const addArgs = reuseExisting
+    ? ['-C', repoRoot, 'worktree', 'add', wtPath, branch]
+    : ['-C', repoRoot, 'worktree', 'add', '-b', branch, wtPath, 'origin/main'];
+  execFileSync('git', addArgs, { stdio: 'inherit' });
 
   const entry = await allocate(cfg, branch);
 
@@ -74,4 +80,19 @@ export async function setup({ branch, cfg, repoRoot }: SetupOptions): Promise<vo
   console.log('');
   console.log('To start the dev server(s):');
   console.log(`  cd ${wtPath} && precisa-worktree dev ${branch}`);
+}
+
+function branchExists(repoRoot: string, branch: string): boolean {
+  const local = spawnSync(
+    'git',
+    ['-C', repoRoot, 'show-ref', '--verify', '--quiet', `refs/heads/${branch}`],
+    { stdio: 'ignore' },
+  );
+  if (local.status === 0) return true;
+  const remote = spawnSync(
+    'git',
+    ['-C', repoRoot, 'show-ref', '--verify', '--quiet', `refs/remotes/origin/${branch}`],
+    { stdio: 'ignore' },
+  );
+  return remote.status === 0;
 }
