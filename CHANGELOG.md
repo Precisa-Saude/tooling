@@ -1,3 +1,9 @@
+## [1.5.0](https://github.com/Precisa-Saude/tooling/compare/v1.4.0...v1.5.0) (2026-04-23)
+
+### Features
+
+* **agent-instructions:** adicionar protocolo de auditoria de segurança ([#22](https://github.com/Precisa-Saude/tooling/issues/22)) ([dd23ee1](https://github.com/Precisa-Saude/tooling/commit/dd23ee1ad6a25c194795d95b0ed0c515078cbf08))
+
 ## [1.4.0](https://github.com/Precisa-Saude/tooling/compare/v1.3.0...v1.4.0) (2026-04-23)
 
 ### Features
