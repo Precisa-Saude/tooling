@@ -1,3 +1,38 @@
+## [1.6.0](https://github.com/Precisa-Saude/tooling/compare/v1.5.1...v1.6.0) (2026-04-23)
+
+### ⚠ BREAKING CHANGES
+
+* **ui:** OpenFooter no longer accepts \`socials\` or
+\`disclaimer\` props; the \`OpenFooterSocial\` type is removed.
+
+Migration for consumers:
+
+\`\`\`diff
+-<OpenFooter
+-  brand={{ ... }}
+-  disclaimer="Este software é fornecido ..."
+-  socials={[
+-    { href: 'https://github.com/...', icon: <GitHubSvg />, label: 'GitHub' },
+-    { href: 'https://www.npmjs.com/...', icon: <NpmSvg />, label: 'npm' },
+-  ]}
+-/>
++<OpenFooter
++  brand={{ ... }}
++  githubUrl="https://github.com/Precisa-Saude/<repo>"
++  npmUrl="https://www.npmjs.com/package/@precisa-saude/<pkg>"
++/>
+\`\`\`
+
+* refactor(ui): drop stale key prop from SocialLink
+
+The key={href} inside SocialLink was a leftover from the previous
+loop-based render; in the current OpenFooter layout SocialLink is used
+twice statically, so the key serves no purpose.
+
+### Features
+
+* **ui:** bake social icons and disclaimer into OpenFooter ([#24](https://github.com/Precisa-Saude/tooling/issues/24)) ([e7aef06](https://github.com/Precisa-Saude/tooling/commit/e7aef0651d082841da822cb108ccd77fbb578b64))
+
 ## [1.5.1](https://github.com/Precisa-Saude/tooling/compare/v1.5.0...v1.5.1) (2026-04-23)
 
 ### Bug Fixes
