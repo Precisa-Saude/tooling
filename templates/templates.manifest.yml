@@ -245,11 +245,3 @@ templates:
     target: .github/workflows/doctor.yml
     required_when: always
     merge_strategy: overwrite
-
-  # Standalone release workflow (alternative to _release+_publish split)
-  # for tooling-style monorepos. Gated off by default; consumers choose
-  # one or the other.
-  - source: github/workflows/release.yml
-    target: .github/workflows/release.yml
-    required_when: never
-    merge_strategy: overwrite

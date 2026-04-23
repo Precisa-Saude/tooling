@@ -1,9 +1,13 @@
-name: CI
+name: CI/CD
 
-# Tooling publishes packages via standalone `release.yml` (semantic-release
-# fires on every push to main). ci.yml wires the canonical `_checks.yml`
-# + `review.yml` reusables so checks run identically to the rest of the
-# ecosystem.
+# Orchestrator — wires reusable workflows. Mirrors the canonical shape
+# used by datasus-brasil / fhir-brasil / medbench-brasil / platform.
+# Each concern is a reusable workflow under `.github/workflows/`:
+#
+#   _checks.yml  — parallel CI checks (lint, typecheck, format, build, test)
+#   _release.yml — semantic-release with packages_changed guard
+#   _publish.yml — npm publish pinned to release_sha
+#   review.yml   — automated code review (PRs only)
 
 on:
   push:
@@ -13,12 +17,15 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  # `contents: write` porque _release.yml (reusable) precisa criar
+  # commits e tags via semantic-release. Workflows reusáveis só
+  # conseguem pedir permissões que o caller também concede.
+  contents: write
   issues: write
   pull-requests: write
-  # `models: read` é necessário porque review.yml (reusable) pode chamar
-  # GitHub Models via GITHUB_TOKEN no fallback. Workflows reusáveis só
-  # conseguem pedir permissões que o caller também concede.
+  id-token: write
+  # `models: read` pelo mesmo motivo: review.yml chama GitHub Models
+  # via GITHUB_TOKEN no fallback de providers.
   models: read
 
 concurrency:
@@ -36,4 +43,28 @@ jobs:
     uses: ./.github/workflows/review.yml
     with:
       pr_number: ${{ github.event.pull_request.number }}
+    secrets: inherit
+
+  release:
+    needs: checks
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/_release.yml
+    secrets: inherit
+
+  publish:
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    uses: ./.github/workflows/_publish.yml
+    with:
+      release_sha: ${{ needs.release.outputs.release_sha }}
+      packages: |
+        packages/agent-instructions
+        packages/cli
+        packages/commitlint-config
+        packages/eslint-config
+        packages/prettier-config
+        packages/themes
+        packages/tsconfig
+        packages/ui
+        packages/worktree-cli
     secrets: inherit
