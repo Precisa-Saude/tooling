@@ -1,3 +1,9 @@
+## [1.5.1](https://github.com/Precisa-Saude/tooling/compare/v1.5.0...v1.5.1) (2026-04-23)
+
+### Bug Fixes
+
+* **worktree-cli:** forward dev flags to vite and reuse existing branches ([#23](https://github.com/Precisa-Saude/tooling/issues/23)) ([0cab460](https://github.com/Precisa-Saude/tooling/commit/0cab460be1ec5febd1458c4545651993b067b950))
+
 ## [1.5.0](https://github.com/Precisa-Saude/tooling/compare/v1.4.0...v1.5.0) (2026-04-23)
 
 ### Features
