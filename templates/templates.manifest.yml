@@ -112,6 +112,16 @@ templates:
     merge_strategy: overwrite
     executable: true
 
+  # ─── Claude Code permissions baseline ─────────────────────────────────────
+  # Shared allow/deny list that unblocks documented AGENTS.md workflows
+  # (git feature branches, gh PR reviews, worktree CLI, pnpm/turbo) without
+  # prompting. Repo-specific or user-specific allows belong in
+  # .claude/settings.local.json (not synced, not committed).
+  - source: .claude/settings.json
+    target: .claude/settings.json
+    required_when: always
+    merge_strategy: overwrite
+
   # ─── Claude Code sub-agents ───────────────────────────────────────────────
   # Generic agents extracted from platform's .claude/agents/. Repo-specific
   # agents (iOS QA, UI polish, perf audit for web) stay in the consumer
