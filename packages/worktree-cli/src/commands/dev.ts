@@ -113,7 +113,10 @@ function spawnService(
   };
 
   const rawArgs = devArgs(svc);
-  const args = ['--filter', svc.pnpmFilter, 'dev', '--', ...rawArgs.map(interpolate)];
+  // No `--` separator: with pnpm 9 + `"dev": "vite"`, inserting `--`
+  // causes vite to receive it as a literal argv entry (`vite -- --port NNN`)
+  // and silently ignore the port flag, falling back to its default.
+  const args = ['--filter', svc.pnpmFilter, 'dev', ...rawArgs.map(interpolate)];
 
   const env = { ...process.env };
   for (const [k, v] of Object.entries(svc.env ?? {})) {
