@@ -2,7 +2,7 @@ export type { HeaderProps } from './Header.js';
 export { Header } from './Header.js';
 export type { MobileDrawerHeader, MobileDrawerItem, MobileDrawerProps } from './MobileDrawer.js';
 export { MobileDrawer } from './MobileDrawer.js';
-export type { OpenFooterBrand, OpenFooterProps, OpenFooterSocial } from './OpenFooter.js';
+export type { OpenFooterBrand, OpenFooterProps } from './OpenFooter.js';
 export { OpenFooter } from './OpenFooter.js';
 export type { PageContainerProps } from './PageContainer.js';
 export { PageContainer } from './PageContainer.js';
