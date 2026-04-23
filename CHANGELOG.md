@@ -1,3 +1,13 @@
+## [1.3.0](https://github.com/Precisa-Saude/tooling/compare/v1.2.0...v1.3.0) (2026-04-23)
+
+### Features
+
+* **templates:** adicionar .claude/settings.json compartilhado ([7c3cd0b](https://github.com/Precisa-Saude/tooling/commit/7c3cd0be200586a68d6a9a1a7c51f498de5f8ab6))
+
+### Documentation
+
+* **agent-instructions:** add guidance on time estimates ([9ca8450](https://github.com/Precisa-Saude/tooling/commit/9ca84507adf541ea7b1efebe3800994de58ff3dc))
+
 ## [1.2.0](https://github.com/Precisa-Saude/tooling/compare/v1.1.2...v1.2.0) (2026-04-22)
 
 ### Features
