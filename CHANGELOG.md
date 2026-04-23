@@ -1,3 +1,9 @@
+## [1.4.0](https://github.com/Precisa-Saude/tooling/compare/v1.3.0...v1.4.0) (2026-04-23)
+
+### Features
+
+* **ui:** Header com modos flex/grid e novo OpenFooter para sites OSS ([#20](https://github.com/Precisa-Saude/tooling/issues/20)) ([02fa415](https://github.com/Precisa-Saude/tooling/commit/02fa415fa8c227525950c6bfe9ce2942c9e75b1e))
+
 ## [1.3.0](https://github.com/Precisa-Saude/tooling/compare/v1.2.0...v1.3.0) (2026-04-23)
 
 ### Features
