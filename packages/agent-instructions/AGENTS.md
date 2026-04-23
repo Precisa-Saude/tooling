@@ -134,6 +134,87 @@ plan exactly or ask before deviating.
 3. **Never silently substitute** a simpler implementation for what was
    agreed.
 
+## Security audit protocol
+
+When asked to run a security audit or classify a security finding,
+establish the threat model **before** labelling severity. "Committed
+in git" is not a severity on its own — it depends on who can read the
+git history and what the value actually grants.
+
+### 1. Check repo visibility first
+
+```bash
+gh repo view --json visibility -q .visibility
+```
+
+(Run from the repo root; `gh` infers the repo from the git remote.
+Returns `PUBLIC` or `PRIVATE`.)
+
+- **Public**: committed values are real leaks. The world can read git
+  history, including past revisions after rotation. Severity should
+  reflect that reach.
+- **Private**: committed values are readable only by repo
+  collaborators + the forge. That's a hygiene concern, not
+  exfiltration. Don't classify as a breach.
+
+### 2. Distinguish three categories before rating severity
+
+- **Real secret** — grants capabilities the attacker doesn't already
+  have. Rotation actually closes something. Examples: server-side API
+  keys, OAuth client secrets, signing keys, database credentials,
+  private keys.
+- **Pseudo-secret** — looks sensitive but ships publicly by design.
+  Already reachable via the client bundle, DNS, npm registry, or prod
+  HTML. Rotation doesn't reduce reach. Examples: anything intended for
+  browser bundles (e.g. `VITE_*`, `NEXT_PUBLIC_*`), identifiers used
+  only to route auth challenges, error-reporting DSNs, read-only
+  frontend tokens from the tech stack.
+- **Hygiene debt** — a pattern that invites future mistakes without
+  currently being a breach. Worth fixing, but don't label Critical.
+  Examples: dev-only `.env` tracked, weak dev credentials, docs out
+  of sync with reality.
+
+### 3. Calibrate severity to reachability × capability
+
+- **Critical** — active exploitation path to prod user data, auth
+  bypass, or RCE reachable from the internet.
+- **High** — real secret exposed past its intended trust boundary;
+  prod-runtime dependency CVE with a known exploit chain reachable
+  from request input.
+- **Medium** — weak default reachable from the internet; missing
+  defense-in-depth on a production surface; dependency CVEs reachable
+  only via narrow paths.
+- **Low / Hygiene** — pseudo-secret committed; dev-only weak
+  credentials; stale docs; committed identifiers that are public
+  elsewhere anyway.
+
+### 4. Per-finding report format
+
+- Severity **and the reasoning** behind it (don't just label).
+- Who can reach/read this today (internet / specific IAM principal /
+  repo reader / already-public).
+- What capability the value grants.
+- What rotating or fixing actually closes that isn't already closed.
+
+### 5. Before recommending rotation or destructive ops
+
+Verify the finding is real:
+
+1. What does this value actually grant?
+2. Who holds it today?
+3. What does rotation close that isn't already closed by another
+   channel?
+
+If the answer to (3) is "nothing meaningful", the finding is hygiene,
+not an incident.
+
+### 6. Don't apply a public-repo template to a private repo
+
+A committed identifier in a private repo and a committed identifier in
+a public repo are not the same finding. Re-check step 1 if the
+severity feels out of proportion to the real exposure — that's usually
+the signal that the threat model drifted.
+
 ## Test coverage — never regresses
 
 When a coverage check fails, the fix is to add tests, not lower
