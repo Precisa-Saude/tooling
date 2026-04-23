@@ -3,9 +3,11 @@
  *
  * Multi-package monorepo strategy: every publishable workspace package is
  * released together at the same version. A single commit on `main` triggers
- * one release cycle that updates the root version, syncs it to every
- * `packages/*` that isn't marked `private`, and publishes each package to
- * npm via `pnpm publish`.
+ * one release cycle that updates the root version and syncs it to every
+ * `packages/*` that isn't marked `private`. The actual `pnpm publish` step
+ * runs in `.github/workflows/_publish.yml` (pinned to the release SHA), so
+ * this config only handles version bumping, changelog, and the release
+ * commit/tag.
  *
  * Version bumps follow Conventional Commits:
  *   - feat:                  minor
@@ -56,17 +58,6 @@ module.exports = {
 
     // Propagate the new version to every non-private workspace package.
     ['@semantic-release/exec', { prepareCmd: 'node scripts/sync-versions.cjs' }],
-
-    // Publish each public workspace package to npm. Runs after prepare, so
-    // every package.json already has the new version. `--no-git-checks`
-    // lets pnpm publish from a dirty working tree (semantic-release holds
-    // staged changes until after the @semantic-release/git step).
-    [
-      '@semantic-release/exec',
-      {
-        publishCmd: 'pnpm -r --filter "./packages/*" publish --access public --no-git-checks',
-      },
-    ],
 
     [
       '@semantic-release/git',
