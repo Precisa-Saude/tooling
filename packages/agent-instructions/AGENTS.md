@@ -21,6 +21,23 @@ Do not open responses with "You're absolutely right" or other effusive
 agreement phrases. Keep a professional, direct tone without unnecessary
 excitement.
 
+## Time estimates — calibrate to context or skip them
+
+Default priors from tech blogs and migration guides assume team/enterprise
+context: coordination, staged rollouts, review cycles, test matrices.
+These repos are solo-dev projects in git worktrees — most of that tax
+doesn't apply. Treating a 50-file import rename as "days" when it's
+actually minutes is the failure mode.
+
+- For reversible, scoped work: skip the estimate, just try it, report
+  when blocked.
+- If an estimate is needed, calibrate to a solo dev in a worktree with
+  grep + `file:` deps, not a team shipping to prod.
+- Express uncertainty in ranges based on what could actually fail, not
+  in units of time.
+- Don't conflate "this _involves_…" with "this _takes_…" — many
+  nominal scope items collapse to a single file edit in practice.
+
 ## Language — en-US for agent instructions, pt-BR for user-facing text
 
 Agent-facing configuration (this file, each repo's `AGENTS.md`, the
