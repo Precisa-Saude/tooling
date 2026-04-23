@@ -108,7 +108,6 @@ function SocialLink({
 }) {
   return (
     <a
-      key={href}
       href={href}
       target="_blank"
       rel="noopener noreferrer"
