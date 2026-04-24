@@ -1,3 +1,9 @@
+## [1.8.0](https://github.com/Precisa-Saude/tooling/compare/v1.7.0...v1.8.0) (2026-04-24)
+
+### Features
+
+* **cli:** siteSourcePath configuravel no _deploy-site.yml ([#29](https://github.com/Precisa-Saude/tooling/issues/29)) ([b517e0a](https://github.com/Precisa-Saude/tooling/commit/b517e0a6fd353b30221c6cfd9006bb7219163b9c))
+
 ## [1.7.0](https://github.com/Precisa-Saude/tooling/compare/v1.6.1...v1.7.0) (2026-04-24)
 
 ### Features
