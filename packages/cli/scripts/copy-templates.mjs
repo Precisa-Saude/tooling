@@ -6,6 +6,9 @@
  *
  * Kept as a plain Node script (no external deps) to avoid pulling anything
  * into the CLI's build-time graph.
+ *
+ * Templates become part of the published tarball — treat them as public
+ * artifacts (no hardcoded repo names, no private-infra references).
  */
 import { cpSync, existsSync, rmSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
