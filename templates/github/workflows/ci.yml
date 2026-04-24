@@ -30,7 +30,6 @@ permissions:
   contents: write
   issues: write
   pull-requests: write
-  deployments: write
   id-token: write
   # `models: read` pelo mesmo motivo: review.yml chama GitHub Models
   # via GITHUB_TOKEN no fallback de providers.
