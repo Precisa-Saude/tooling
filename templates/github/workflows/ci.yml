@@ -82,5 +82,6 @@ jobs:
     with:
       project_name: '{{SITE_PROJECT_NAME}}'
       site_filter: '{{SITE_FILTER}}'
+      site_source_path: '{{SITE_SOURCE_PATH}}'
     secrets: inherit
   # {{/if}}
