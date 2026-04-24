@@ -58,6 +58,14 @@ export interface PrecisaManifest {
    */
   siteProjectName?: string;
 
+  /**
+   * Path prefix (relative to repo root, trailing slash) treated as site
+   * source for change detection in `_deploy-site.yml`. Defaults to
+   * `site/` — override to `packages/site/` for monorepos where the site
+   * lives under `packages/`.
+   */
+  siteSourcePath?: string;
+
   /** Public-OSS or private-internal. Controls which templates are rendered. */
   visibility: 'oss' | 'private';
 }
@@ -134,6 +142,7 @@ export function tokenContext(manifest: PrecisaManifest): Record<string, string> 
     SECURITY_EMAIL: manifest.contactEmails.security,
     SITE_FILTER: manifest.siteFilter ?? '',
     SITE_PROJECT_NAME: manifest.siteProjectName ?? '',
+    SITE_SOURCE_PATH: manifest.siteSourcePath ?? 'site/',
     VISIBILITY: manifest.visibility,
   };
 }
@@ -196,6 +205,9 @@ export function validateManifest(raw: unknown): ManifestValidationError[] {
   }
   if (m.siteFilter !== undefined && typeof m.siteFilter !== 'string') {
     errors.push({ message: 'must be a string', path: 'siteFilter' });
+  }
+  if (m.siteSourcePath !== undefined && typeof m.siteSourcePath !== 'string') {
+    errors.push({ message: 'must be a string', path: 'siteSourcePath' });
   }
   if (!m.contactEmails || typeof m.contactEmails !== 'object') {
     errors.push({ message: 'must be an object', path: 'contactEmails' });
