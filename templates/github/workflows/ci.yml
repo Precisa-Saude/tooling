@@ -10,11 +10,9 @@ name: CI/CD
 #   review.yml        — automated Anthropic → OpenAI code review
 #   publish-tag.yml   — manual recovery (workflow_dispatch)
 #
-# This orchestrator wires the pieces together. Each repo adapts:
-#   - Which reusable workflows to call (comment out what doesn't apply)
-#   - The publish `packages` list
-#   - The site `project_name` and `site_filter`
-#   - Extra repo-specific workflows (e.g. fhir's publish-ig.yml)
+# Per-repo customization flows through `.precisa.json`:
+#   publishesToNpm + publishPackages[] gate the `publish` job
+#   hasSite + siteProjectName + siteFilter gate the `deploy-site` job
 
 on:
   push:
@@ -53,6 +51,7 @@ jobs:
     with:
       pr_number: ${{ github.event.pull_request.number }}
     secrets: inherit
+  # {{#if PUBLISHES_TO_NPM}}
 
   # ── Release (main only, guarded on package changes) ────────────
   release:
@@ -70,16 +69,18 @@ jobs:
       release_sha: ${{ needs.release.outputs.release_sha }}
       # Newline-separated list of package directories. One per line.
       packages: |
-        packages/core
-        packages/calculators
+        {{PUBLISH_PACKAGES_YAML}}
     secrets: inherit
+  # {{/if}}
+  # {{#if HAS_SITE}}
 
-  # ── Deploy site (repos with a site — remove if not applicable) ──
+  # ── Deploy site (Cloudflare Pages + Slack notify) ──────────────
   deploy-site:
     needs: checks
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/_deploy-site.yml
     with:
-      project_name: '{{PROJECT_NAME}}'
-      site_filter: '@{{SITE_FILTER}}'
+      project_name: '{{SITE_PROJECT_NAME}}'
+      site_filter: '{{SITE_FILTER}}'
     secrets: inherit
+  # {{/if}}
