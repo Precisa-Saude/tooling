@@ -1,3 +1,14 @@
+## [1.7.0](https://github.com/Precisa-Saude/tooling/compare/v1.6.1...v1.7.0) (2026-04-24)
+
+### Features
+
+* **cli:** tokens e blocos condicionais pro ci.yml render por repo ([#28](https://github.com/Precisa-Saude/tooling/issues/28)) ([5e81d75](https://github.com/Precisa-Saude/tooling/commit/5e81d752aeefd9a7e8483d95a46a2e212e619a4a)), closes [#if](https://github.com/Precisa-Saude/tooling/issues/if)
+
+### Chores
+
+* **templates:** remover deployments: write nao utilizado do ci.yml ([#27](https://github.com/Precisa-Saude/tooling/issues/27)) ([68aed4b](https://github.com/Precisa-Saude/tooling/commit/68aed4b62058fb289ac6c1d6543ae67d945d886c))
+* **templates:** remover shamefully-hoist=false do .npmrc ([#26](https://github.com/Precisa-Saude/tooling/issues/26)) ([d489412](https://github.com/Precisa-Saude/tooling/commit/d489412e00fccf90850858fd975e714f2fb0a64b))
+
 ## [1.6.1](https://github.com/Precisa-Saude/tooling/compare/v1.6.0...v1.6.1) (2026-04-24)
 
 ### ⚠ BREAKING CHANGES

@@ -1,6 +1,6 @@
 {
   "name": "@precisa-saude/worktree-cli",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "description": "Shared git-worktree lifecycle CLI for Precisa Saúde repositories — creates/dev-runs/tears-down feature worktrees with per-repo port allocation. Drop-in replacement for each repo's `scripts/worktree.sh`.",
   "keywords": [
     "git-worktree",
