@@ -1,6 +1,6 @@
 {
   "name": "@precisa-saude/commitlint-config",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "Shared commitlint config for Precisa Saúde repositories — conventional commits with per-repo scopes and AI-attribution blocking.",
   "keywords": [
     "commitlint",

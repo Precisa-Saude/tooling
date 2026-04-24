@@ -1,3 +1,18 @@
+## [1.6.1](https://github.com/Precisa-Saude/tooling/compare/v1.6.0...v1.6.1) (2026-04-24)
+
+### ⚠ BREAKING CHANGES
+
+* **release:** unify release+publish with the rest of the ecosystem (#25)
+
+### Bug Fixes
+
+* **cli:** nota sobre higiene de templates no copy-templates ([131eb43](https://github.com/Precisa-Saude/tooling/commit/131eb43519348453923d4bbe737f8bc9f038000f))
+* **templates:** usar contexto do repo atual no pr-review-responder ([c1dde13](https://github.com/Precisa-Saude/tooling/commit/c1dde13348f8f1966d1c79c6fba88fc4901484d8))
+
+### CI/CD
+
+* **release:** unify release+publish with the rest of the ecosystem ([#25](https://github.com/Precisa-Saude/tooling/issues/25)) ([55942e3](https://github.com/Precisa-Saude/tooling/commit/55942e3c8fe398aefb4ba7406a4a98a7b163ba21))
+
 ## [1.6.0](https://github.com/Precisa-Saude/tooling/compare/v1.5.1...v1.6.0) (2026-04-23)
 
 ### ⚠ BREAKING CHANGES
