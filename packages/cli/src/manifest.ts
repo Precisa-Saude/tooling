@@ -36,8 +36,28 @@ export interface PrecisaManifest {
   /** Publishes any workspace package to npm? */
   publishesToNpm: boolean;
 
+  /**
+   * Workspace package directories (relative to repo root) that the
+   * `publish` job in `ci.yml` should pass to `_publish.yml`. Only read
+   * when `publishesToNpm: true`. Example: `["packages/core", "packages/cli"]`.
+   */
+  publishPackages?: string[];
+
   /** Schema version of this manifest file. Bump when the schema changes. */
   schemaVersion: 1;
+
+  /**
+   * pnpm filter selector for the site package, passed to the deploy
+   * workflow. Only read when `hasSite: true`. Example: `@my-repo/site`.
+   */
+  siteFilter?: string;
+
+  /**
+   * Cloudflare Pages project name for the deploy-site workflow. Only
+   * read when `hasSite: true`.
+   */
+  siteProjectName?: string;
+
   /** Public-OSS or private-internal. Controls which templates are rendered. */
   visibility: 'oss' | 'private';
 }
@@ -104,10 +124,16 @@ export function tokenContext(manifest: PrecisaManifest): Record<string, string> 
     NODE_VERSION: manifest.nodeVersion ?? '22',
     OWNER_ORG: manifest.owner,
     PNPM_VERSION: manifest.pnpmVersion ?? '9.15.9',
+    // YAML block-scalar body for the `packages: |` input of `_publish.yml`.
+    // The template provides the first entry's indent; subsequent entries
+    // get 8 spaces explicitly to match. Empty when no packages declared.
+    PUBLISH_PACKAGES_YAML: (manifest.publishPackages ?? []).join('\n        '),
     PUBLISHES_TO_NPM: String(manifest.publishesToNpm),
     REPO_NAME: manifest.name,
     REPO_SLUG: `${manifest.owner}/${manifest.name}`,
     SECURITY_EMAIL: manifest.contactEmails.security,
+    SITE_FILTER: manifest.siteFilter ?? '',
+    SITE_PROJECT_NAME: manifest.siteProjectName ?? '',
     VISIBILITY: manifest.visibility,
   };
 }
@@ -142,6 +168,34 @@ export function validateManifest(raw: unknown): ManifestValidationError[] {
   }
   if (!Array.isArray(m.commitScopes)) {
     errors.push({ message: 'must be an array of strings', path: 'commitScopes' });
+  }
+  if (m.publishPackages !== undefined) {
+    if (!Array.isArray(m.publishPackages)) {
+      errors.push({ message: 'must be an array of strings', path: 'publishPackages' });
+    } else if (m.publishPackages.some((p) => typeof p !== 'string' || !p)) {
+      errors.push({ message: 'entries must be non-empty strings', path: 'publishPackages' });
+    }
+  }
+  if (m.publishesToNpm) {
+    if (!Array.isArray(m.publishPackages) || m.publishPackages.length === 0) {
+      errors.push({
+        message: 'must have at least one entry when publishesToNpm is true',
+        path: 'publishPackages',
+      });
+    }
+  }
+  if (m.hasSite === true) {
+    for (const key of ['siteProjectName', 'siteFilter'] as const) {
+      if (typeof m[key] !== 'string' || !m[key]) {
+        errors.push({ message: 'required and non-empty when hasSite is true', path: key });
+      }
+    }
+  }
+  if (m.siteProjectName !== undefined && typeof m.siteProjectName !== 'string') {
+    errors.push({ message: 'must be a string', path: 'siteProjectName' });
+  }
+  if (m.siteFilter !== undefined && typeof m.siteFilter !== 'string') {
+    errors.push({ message: 'must be a string', path: 'siteFilter' });
   }
   if (!m.contactEmails || typeof m.contactEmails !== 'object') {
     errors.push({ message: 'must be an object', path: 'contactEmails' });
