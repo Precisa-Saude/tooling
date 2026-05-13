@@ -1,7 +1,7 @@
 /**
  * Integration test for the inheritEnvFromMain path of setup. Spawns a
  * real `git worktree add` in a temp repo and verifies env files end up
- * with both the writeFiles port keys and the inherited dev creds.
+ * with both the writeFiles port keys and the inherited keys.
  *
  * Network-free and deterministic — works against a tmpdir, no pnpm
  * install (set `install: false`).
@@ -29,10 +29,10 @@ describe('setup with inheritEnvFromMain', () => {
       execFileSync('git', ['-C', root, 'config', 'user.name', 'test']);
       execFileSync('git', ['-C', root, 'config', 'commit.gpgsign', 'false']);
       writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'fixture' }));
-      // Main worktree's .env.local with two creds keys.
+      // Main worktree's .env.local with two arbitrary inherited keys.
       writeFileSync(
         join(root, '.env.local'),
-        '# main worktree creds\nCOGNITO_POOL=abc\nSTRIPE_KEY=sk_test_xxx\n',
+        '# main worktree env\nINHERIT_KEY_A=abc\nINHERIT_KEY_B=def\n',
       );
       execFileSync('git', ['-C', root, 'add', '.']);
       execFileSync('git', ['-C', root, 'commit', '-q', '-m', 'init']);
@@ -72,9 +72,9 @@ describe('setup with inheritEnvFromMain', () => {
 
       // Port from writeFiles preserved.
       assert.match(wtEnv, /^PORT=4010$/m);
-      // Creds from main inherited.
-      assert.match(wtEnv, /COGNITO_POOL=abc/);
-      assert.match(wtEnv, /STRIPE_KEY=sk_test_xxx/);
+      // Keys from main inherited.
+      assert.match(wtEnv, /INHERIT_KEY_A=abc/);
+      assert.match(wtEnv, /INHERIT_KEY_B=def/);
       // Header present so it's clear how the keys got there.
       assert.match(wtEnv, /# Inherited from main worktree/);
 
