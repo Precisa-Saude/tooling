@@ -35,6 +35,7 @@
     "build": "tsup",
     "clean": "rm -rf dist .turbo",
     "dev": "tsup --watch",
+    "test": "pnpm build && node --test test/*.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

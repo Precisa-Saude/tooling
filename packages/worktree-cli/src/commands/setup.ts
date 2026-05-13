@@ -1,10 +1,11 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 import chalk from 'chalk';
 
 import { type WorktreeConfig } from '../config.js';
+import { buildInheritedAppend } from '../env-merge.js';
 import { logFile, worktreePath } from '../paths.js';
 import { allocate } from '../registry.js';
 
@@ -65,6 +66,40 @@ export async function setup({ branch, cfg, repoRoot }: SetupOptions): Promise<vo
       mkdirSync(dirname(fullPath), { recursive: true });
       writeFileSync(fullPath, interpolated);
       console.log(`  wrote ${path}`);
+    }
+  }
+
+  // Inherit non-port env vars from the main worktree's files. Runs after
+  // writeFiles so port keys written by the CLI stay authoritative — only
+  // missing keys are appended.
+  if (cfg.inheritEnvFromMain?.length) {
+    console.log(chalk.bold('==> Inheriting non-port env vars from main worktree'));
+    for (const relPath of cfg.inheritEnvFromMain) {
+      const mainFile = resolve(repoRoot, relPath);
+      const wtFile = resolve(wtPath, relPath);
+
+      if (!existsSync(mainFile)) {
+        console.log(chalk.dim(`  skip ${relPath} (not present in main worktree)`));
+        continue;
+      }
+
+      const mainContents = readFileSync(mainFile, 'utf-8');
+      const wtContents = existsSync(wtFile) ? readFileSync(wtFile, 'utf-8') : '';
+      const appended = buildInheritedAppend(mainContents, wtContents);
+
+      if (appended.length === 0) {
+        console.log(chalk.dim(`  skip ${relPath} (no missing keys to inherit)`));
+        continue;
+      }
+
+      mkdirSync(dirname(wtFile), { recursive: true });
+      if (existsSync(wtFile)) {
+        appendFileSync(wtFile, appended);
+      } else {
+        writeFileSync(wtFile, appended.replace(/^\n/, ''));
+      }
+      const inheritedCount = appended.split('\n').filter((l) => /^[A-Za-z_]/.test(l)).length;
+      console.log(`  inherited ${inheritedCount} key(s) into ${relPath}`);
     }
   }
 
