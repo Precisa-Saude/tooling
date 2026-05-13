@@ -45,6 +45,29 @@ export interface WorktreeConfig {
    */
   directoryPrefix: string;
   /**
+   * Files in the main worktree whose KEY=VALUE lines should be appended
+   * to the new worktree's corresponding file at the end of `setup`.
+   * Keys already present in the worktree's file (typically from
+   * `writeFiles`, e.g. `PORT`, `VITE_API_URL`) are NOT overwritten —
+   * only missing keys are appended.
+   *
+   * Useful when the repo's `.env.local` files in main hold long-lived
+   * dev credentials that every worktree needs (Cognito, Stripe, S3
+   * buckets, DynamoDB tables, etc.) and that aren't worktree-scoped.
+   * Without this, each worktree starts with only the port keys from
+   * `writeFiles` and any service that reads those creds crashes on
+   * first request.
+   *
+   * Paths are relative to the repo root and resolve against the main
+   * worktree (where the CLI is invoked). If a file is missing in main,
+   * the inherit step is skipped for that entry (no error). Comments and
+   * blank lines in the source file are not copied.
+   *
+   * Example (platform):
+   *   inheritEnvFromMain: ['apps/api/.env.local', 'apps/web/.env.local']
+   */
+  inheritEnvFromMain?: string[];
+  /**
    * Whether to run `pnpm install` during setup. Defaults to true. Set to
    * false for repos where install should be manual or where the script
    * is invoked inside a container.

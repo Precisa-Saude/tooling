@@ -68,10 +68,23 @@ Add a `worktree` field to the repo's root `package.json`:
         "logPrefix": "precisa-web",
         "env": { "VITE_API_URL": "http://localhost:{api_port}/api" }
       }
-    ]
+    ],
+    "writeFiles": [
+      { "path": "apps/api/.env.local", "contents": "PORT={api_port}\n" },
+      {
+        "path": "apps/web/.env.local",
+        "contents": "VITE_DEV_PORT={web_port}\nVITE_API_URL=http://localhost:{api_port}/api\n"
+      }
+    ],
+    "inheritEnvFromMain": ["apps/api/.env.local", "apps/web/.env.local"],
+    "buildCommand": "pnpm turbo run build --filter='./packages/**'"
   }
 }
 ```
+
+`inheritEnvFromMain` appends KEY=VALUE lines from the main worktree's `.env.local` files into the new worktree's corresponding files at the end of `setup`. Port keys written by `writeFiles` are NOT overwritten — only missing keys are appended. Useful when the main worktree holds long-lived dev credentials (Cognito, Stripe, S3 buckets, DynamoDB tables) that every worktree needs but that aren't worktree-scoped.
+
+`buildCommand` runs after `pnpm install` to pre-build workspace packages. Required when downstream apps load workspace deps via Node ESM (e.g. `apps/api` reading `packages/*/dist/index.js`) — without it, the API will crash with `ERR_MODULE_NOT_FOUND` on first start because `dist/` isn't populated.
 
 ## Usage
 
