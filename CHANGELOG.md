@@ -1,3 +1,17 @@
+## [1.9.0](https://github.com/Precisa-Saude/tooling/compare/v1.8.0...v1.9.0) (2026-05-13)
+
+### Features
+
+* **worktree-cli:** inherit non-port env vars from main worktree ([#33](https://github.com/Precisa-Saude/tooling/issues/33)) ([f57528b](https://github.com/Precisa-Saude/tooling/commit/f57528b43238765ef979f7cc94382e9e6ddc68c2))
+
+### CI/CD
+
+* bump pnpm/action-setup para v5 (Node.js 24) ([#30](https://github.com/Precisa-Saude/tooling/issues/30)) ([a50119c](https://github.com/Precisa-Saude/tooling/commit/a50119cf7f89b1fb4488abbde5aed3f81f274814))
+
+### Chores
+
+* **templates:** adicionar environment gate npm-publish no _publish.yml ([#31](https://github.com/Precisa-Saude/tooling/issues/31)) ([f7f7d23](https://github.com/Precisa-Saude/tooling/commit/f7f7d231b5ddf5781f745bd5303dc368b678b9f6))
+
 ## [1.8.0](https://github.com/Precisa-Saude/tooling/compare/v1.7.0...v1.8.0) (2026-04-24)
 
 ### Features

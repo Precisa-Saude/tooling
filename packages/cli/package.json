@@ -1,6 +1,6 @@
 {
   "name": "@precisa-saude/cli",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Bootstrap and sync Precisa Saúde repositories — the `precisa` CLI.",
   "keywords": [
     "cli",
