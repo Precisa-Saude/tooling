@@ -1,3 +1,9 @@
+## [1.10.0](https://github.com/Precisa-Saude/tooling/compare/v1.9.0...v1.10.0) (2026-05-14)
+
+### Features
+
+* pin actions e tripwire publish-watch (postmortem TanStack) ([#34](https://github.com/Precisa-Saude/tooling/issues/34)) ([4bcd453](https://github.com/Precisa-Saude/tooling/commit/4bcd453e8181a5d0fcde91cc250267835a7564f4))
+
 ## [1.9.0](https://github.com/Precisa-Saude/tooling/compare/v1.8.0...v1.9.0) (2026-05-13)
 
 ### Features

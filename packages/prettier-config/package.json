@@ -1,6 +1,6 @@
 {
   "name": "@precisa-saude/prettier-config",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "Shared Prettier config for Precisa Saúde repositories.",
   "keywords": [
     "prettier",
