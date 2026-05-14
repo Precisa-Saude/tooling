@@ -236,6 +236,11 @@ templates:
     required_when: publishes_to_npm
     merge_strategy: overwrite
 
+  - source: github/workflows/publish-watch.yml
+    target: .github/workflows/publish-watch.yml
+    required_when: publishes_to_npm
+    merge_strategy: overwrite
+
   - source: github/workflows/_deploy-site.yml
     target: .github/workflows/_deploy-site.yml
     required_when: has_site

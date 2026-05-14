@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import chalk from 'chalk';
 
 import { colorDiff } from '../lib/diff.js';
@@ -55,7 +58,58 @@ export async function runSync(opts: SyncOptions): Promise<void> {
     ),
   );
 
+  printPostSyncReminders(cwd, outcomes);
+
   if (summary.error > 0) process.exit(1);
+}
+
+// Best-effort reminders for steps that have to happen in the GitHub UI
+// (creating environments, setting up required reviewers) that this CLI
+// cannot do remotely. Triggered when a workflow that depends on the
+// reminder was actually written or already present in the repo.
+function printPostSyncReminders(cwd: string, outcomes: ApplyOutcome[]): void {
+  const touched = outcomes
+    .filter((o) => o.kind === 'create' || o.kind === 'update')
+    .map((o) => o.target);
+
+  const publishYml = join(cwd, '.github/workflows/_publish.yml');
+  const hasPublishWorkflow = existsSync(publishYml);
+  const publishReferencesEnv =
+    hasPublishWorkflow &&
+    readFileSync(publishYml, 'utf8').includes('environment:') &&
+    readFileSync(publishYml, 'utf8').includes('npm-publish');
+
+  const publishTouched = touched.some((t) => t.endsWith('_publish.yml'));
+  if (publishReferencesEnv && publishTouched) {
+    console.log('');
+    console.log(chalk.bold.yellow('Post-sync — manual GitHub setup'));
+    console.log(
+      chalk.dim(
+        '  Settings → Environments → npm-publish must exist with at least one required reviewer.',
+      ),
+    );
+    console.log(
+      chalk.dim(
+        '  Without it the publish step runs unattended. The CLI cannot create environments remotely.',
+      ),
+    );
+  }
+
+  const watchTouched = touched.some((t) => t.endsWith('publish-watch.yml'));
+  if (watchTouched) {
+    console.log('');
+    console.log(chalk.bold.yellow('Post-sync — publish-watch'));
+    console.log(
+      chalk.dim(
+        '  publish-watch.yml now runs every 15 min. Confirm npm package names in `packages/**` are',
+      ),
+    );
+    console.log(
+      chalk.dim(
+        '  current and that semantic-release tag convention (`<name>@<ver>` or `v<ver>`) matches.',
+      ),
+    );
+  }
 }
 
 interface Summary {
