@@ -44,7 +44,7 @@ jobs:
       - name: Check for package changes across pushed commits
         id: changes
         if: inputs.require_package_changes
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           # Compares `before..after` from the push payload. Paginates explicitly
           # because `compareCommits` truncates at 300 files per page — a large
@@ -80,18 +80,18 @@ jobs:
       - name: Generate GitHub App token
         id: app-token
         if: "!inputs.require_package_changes || steps.changes.outputs.packages_changed == 'true'"
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: "!inputs.require_package_changes || steps.changes.outputs.packages_changed == 'true'"
         with:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         if: "!inputs.require_package_changes || steps.changes.outputs.packages_changed == 'true'"
 
       - uses: actions/setup-node@v6
