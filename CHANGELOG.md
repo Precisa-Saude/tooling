@@ -1,3 +1,13 @@
+## [1.11.0](https://github.com/Precisa-Saude/tooling/compare/v1.10.0...v1.11.0) (2026-07-09)
+
+### Features
+
+* **tsconfig:** alinhar module do base para ESNext ([3aae244](https://github.com/Precisa-Saude/tooling/commit/3aae24416568cadf425699c1cbf81f073602b436))
+
+### Bug Fixes
+
+* **eslint:** elevar typescript-eslint para 8.63.0 (suporte ao TS 6.0) ([59c054c](https://github.com/Precisa-Saude/tooling/commit/59c054c8df2923fb1a21777170828b9d0d32cb4a))
+
 ## [1.10.0](https://github.com/Precisa-Saude/tooling/compare/v1.9.0...v1.10.0) (2026-05-14)
 
 ### Features
