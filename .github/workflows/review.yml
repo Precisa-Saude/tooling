@@ -30,11 +30,11 @@ jobs:
       should_run: ${{ steps.check.outputs.should_run }}
       review_round: ${{ steps.check.outputs.review_round }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Decide whether to run
         id: check
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -95,7 +95,7 @@ jobs:
       GITHUB_MODELS_MODEL: openai/gpt-4o-mini
       MAX_DIFF_SIZE: '150000'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -390,7 +390,7 @@ jobs:
           SCRIPT
 
       - name: Post review
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
