@@ -1,3 +1,10 @@
+## [1.11.1](https://github.com/Precisa-Saude/tooling/compare/v1.11.0...v1.11.1) (2026-07-09)
+
+### Bug Fixes
+
+* **ci:** atualizar actions para o runtime Node 24 em templates e workflows ([#38](https://github.com/Precisa-Saude/tooling/issues/38)) ([d1d2a8b](https://github.com/Precisa-Saude/tooling/commit/d1d2a8b3315ba810d9a2beee51fc0ff60bb3264b))
+* **cli:** republicar quando templates/ mudam na detecção de release ([#39](https://github.com/Precisa-Saude/tooling/issues/39)) ([141f102](https://github.com/Precisa-Saude/tooling/commit/141f10231be7c02bad1aa46237b09cb765a7aebb))
+
 ## [1.11.0](https://github.com/Precisa-Saude/tooling/compare/v1.10.0...v1.11.0) (2026-07-09)
 
 ### Features
