@@ -3,7 +3,7 @@
   "display": "Precisa Saúde base",
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ES2022",
+    "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ES2022"],
     "strict": true,
