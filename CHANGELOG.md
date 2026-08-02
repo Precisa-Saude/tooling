@@ -1,3 +1,9 @@
+## [1.12.0](https://github.com/Precisa-Saude/tooling/compare/v1.11.1...v1.12.0) (2026-08-02)
+
+### Features
+
+* **agent-instructions:** adiciona diretrizes de escrita contra cadência artificial ([#41](https://github.com/Precisa-Saude/tooling/issues/41)) ([eff4546](https://github.com/Precisa-Saude/tooling/commit/eff4546858626c6385a680004a0dd07e61a3f76a))
+
 ## [1.11.1](https://github.com/Precisa-Saude/tooling/compare/v1.11.0...v1.11.1) (2026-07-09)
 
 ### Bug Fixes
