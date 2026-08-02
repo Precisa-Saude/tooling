@@ -21,6 +21,80 @@ Do not open responses with "You're absolutely right" or other effusive
 agreement phrases. Keep a professional, direct tone without unnecessary
 excitement.
 
+## Writing style: avoid machine cadence
+
+Applies to **everything with a human reader**: docs, READMEs, CHANGELOG
+entries, commit bodies, PR descriptions, issue and PR templates, slide
+decks, landing copy, marketing text, and code comments written for a
+person.
+
+The failure mode is **rhythmic, not lexical**. Swapping vocabulary while
+keeping the sentence rhythm does not fix it, because the cadence is what
+reads as generated. Most of the patterns below survive a naive
+find-and-replace, so they have to be rewritten at the sentence level.
+
+### Patterns to avoid
+
+**Matched pairs.** Two clauses of similar length set in opposition,
+usually framed as a correction. Both the explicit form and the implicit
+one, which is the same rhythm with the connective removed.
+
+- Avoid: `LGPD não é um parágrafo na política. É uma condição no código.`
+- Avoid: `O histórico não existe. Existem PDFs soltos.`
+- Instead: say the thing once, in one sentence, and move on.
+
+**Tricolons.** Three parallel beats, often repeating a word, escalating
+into a reveal.
+
+- Avoid: `Um valor plausível, num campo plausível, completamente errado.`
+- Instead: one clause, then the consequence.
+
+**Appositive glosses.** Breaking a sentence to define a term you just
+used.
+
+- Avoid: `A tendência, que é o dado clínico, ninguém vê.`
+- Instead: choose the right term and trust it, or explain it separately.
+
+**Rhetorical question followed by its own answer.** Rewrite as a plain
+subordinate clause.
+
+- Avoid: `Duas páginas discordam? Então o laudo vai pra revisão.`
+- Prefer: `Quando duas páginas discordam, o laudo vai pra revisão.`
+
+**Clever inversions and chiasmus.** Reads as a slogan, not an
+explanation.
+
+- Avoid: `A parte mais importante do pipeline de IA é a que decide não chamar a IA.`
+- Instead: describe the mechanism plainly.
+
+**Tacked-on validators.** Closers that add no information: `E isso é uma
+resposta legítima.`, `O que importa aqui é…`, `E isso faz toda a
+diferença.` Cut them. The preceding sentence already carried the point.
+
+**Aphoristic closure.** Ending every paragraph on something quotable.
+Real explanation has paragraphs that simply stop.
+
+**Uniform sentence length.** Several medium-length declaratives in a row
+read as generated even when each sentence is fine alone.
+
+**"Not only X, but Y"** and similar balanced connectives. Prefer a plain
+`e`.
+
+**Em dashes (`—`).** Do not use them. Use a comma, a colon, parentheses,
+or a full stop. This is the most visible single tell, and it is a hard
+rule. The one exception is a verbatim quotation, which keeps its source
+punctuation unchanged. Never alter a quote to satisfy a style rule.
+
+### What to do instead
+
+- Vary sentence length deliberately. Let one sentence run long with a
+  subordinate clause, then let the next be four words.
+- Prefer a concrete specific over an abstraction: a unit, a file name, a
+  real number, an actual failure that happened.
+- Allow asides that do not resolve neatly.
+- Read it back before committing. If every paragraph lands a punchline,
+  rewrite the ones that are not carrying real information.
+
 ## Time estimates — calibrate to context or skip them
 
 Default priors from tech blogs and migration guides assume team/enterprise
