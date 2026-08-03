@@ -1,3 +1,10 @@
+## [1.12.1](https://github.com/Precisa-Saude/tooling/compare/v1.12.0...v1.12.1) (2026-08-03)
+
+### Bug Fixes
+
+* **cli:** auditoria de drift confiável — exit codes separados e sem devDep ([#42](https://github.com/Precisa-Saude/tooling/issues/42)) ([7afea83](https://github.com/Precisa-Saude/tooling/commit/7afea8342ae1aa319e3f2bed3d916873b06a0973))
+* **templates:** reconcilia templates com o que os consumidores já corrigiram ([#43](https://github.com/Precisa-Saude/tooling/issues/43)) ([e46ca5f](https://github.com/Precisa-Saude/tooling/commit/e46ca5f3e8dd632711a47124ebf4f5849110aa19))
+
 ## [1.12.0](https://github.com/Precisa-Saude/tooling/compare/v1.11.1...v1.12.0) (2026-08-02)
 
 ### Features
