@@ -22,6 +22,26 @@ export interface PrecisaManifest {
   /** Does this repo ship a website? Controls preview-deploy workflows. */
   hasSite: boolean;
 
+  /**
+   * Alvos que este repo mantém divergentes de propósito. `doctor` e `sync`
+   * pulam cada caminho listado: o doctor não conta como drift e o sync não
+   * sobrescreve.
+   *
+   * Existe porque 39 dos 44 templates são `overwrite` e não havia como
+   * declarar customização deliberada — ela virava drift permanente, reportado
+   * todo mês, e um `sync` a descartava sem backup nem confirmação. Repos
+   * documentavam o fork num comentário no topo do arquivo, que é prosa, não
+   * mecanismo.
+   *
+   * Use com parcimônia e diga por quê: cada entrada é um arquivo que deixa de
+   * receber correção upstream. Preferir levar a mudança para o `tooling`
+   * quando ela servir a todos os repos.
+   *
+   * Exemplo: `[".github/workflows/_checks.yml"]` — job de invariante do
+   * dataset que não tem equivalente no template.
+   */
+  ignoreTemplates?: string[];
+
   /** Repository name (typically matches the GitHub repo name). */
   name: string;
 
@@ -137,6 +157,12 @@ function normalizeSourcePaths(value: string | string[] | undefined): string {
     .join(',');
 }
 
+/** true quando o repo declarou este alvo como divergência deliberada. */
+export function isIgnored(target: string, manifest: PrecisaManifest): boolean {
+  const alvo = target.trim();
+  return (manifest.ignoreTemplates ?? []).some((t) => t.trim() === alvo);
+}
+
 export function tokenContext(manifest: PrecisaManifest): Record<string, string> {
   return {
     COMMIT_SCOPES: manifest.commitScopes.join(','),
@@ -197,6 +223,13 @@ export function validateManifest(raw: unknown): ManifestValidationError[] {
   }
   if (!Array.isArray(m.commitScopes)) {
     errors.push({ message: 'must be an array of strings', path: 'commitScopes' });
+  }
+  if (m.ignoreTemplates !== undefined) {
+    if (!Array.isArray(m.ignoreTemplates)) {
+      errors.push({ message: 'must be an array of strings', path: 'ignoreTemplates' });
+    } else if (m.ignoreTemplates.some((t) => typeof t !== 'string' || !t.trim())) {
+      errors.push({ message: 'entries must be non-empty strings', path: 'ignoreTemplates' });
+    }
   }
   if (m.publishPackages !== undefined) {
     if (!Array.isArray(m.publishPackages)) {

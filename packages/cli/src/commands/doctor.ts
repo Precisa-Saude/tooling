@@ -9,7 +9,7 @@ import {
   renderTokens,
   type TemplateEntry,
 } from '../lib/templates.js';
-import { isRequired, loadManifest, tokenContext } from '../manifest.js';
+import { isIgnored, isRequired, loadManifest, tokenContext } from '../manifest.js';
 
 type Severity = 'ok' | 'info' | 'warning' | 'error';
 
@@ -70,6 +70,18 @@ export async function runDoctor(): Promise<void> {
       reports.push({
         message: 'Missing',
         severity: 'error',
+        target: entry.target,
+      });
+      continue;
+    }
+
+    // Divergência declarada em `ignoreTemplates`: informativa, nunca warning.
+    // Sem isso o repo receberia o mesmo alerta todo mês por uma customização
+    // que ele escolheu manter, e o sinal perderia credibilidade.
+    if (isIgnored(entry.target, manifest)) {
+      reports.push({
+        message: 'Divergência deliberada (ignoreTemplates) — sync não toca',
+        severity: 'info',
         target: entry.target,
       });
       continue;

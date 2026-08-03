@@ -6,7 +6,7 @@ import chalk from 'chalk';
 import { colorDiff } from '../lib/diff.js';
 import { type ApplyOutcome, applyTemplate } from '../lib/merge.js';
 import { loadTemplateManifest, readTemplateSource, renderTokens } from '../lib/templates.js';
-import { isRequired, loadManifest, tokenContext } from '../manifest.js';
+import { isIgnored, isRequired, loadManifest, tokenContext } from '../manifest.js';
 
 export interface SyncOptions {
   dryRun: boolean;
@@ -28,7 +28,11 @@ export async function runSync(opts: SyncOptions): Promise<void> {
     process.exit(1);
   }
 
-  const entries = loadTemplateManifest().filter((e) => isRequired(e.required_when, manifest));
+  // `ignoreTemplates` sai antes de qualquer escrita: são divergências que o
+  // repo declarou de propósito, e `overwrite` as descartaria sem confirmação.
+  const required = loadTemplateManifest().filter((e) => isRequired(e.required_when, manifest));
+  const ignored = required.filter((e) => isIgnored(e.target, manifest));
+  const entries = required.filter((e) => !isIgnored(e.target, manifest));
   const context = tokenContext(manifest);
 
   const outcomes: ApplyOutcome[] = [];
@@ -46,6 +50,11 @@ export async function runSync(opts: SyncOptions): Promise<void> {
   }
 
   console.log('');
+  for (const e of ignored) {
+    console.log(
+      `${chalk.blue('i')} ${chalk.dim('ignorado  ')}${e.target} ${chalk.dim('(ignoreTemplates)')}`,
+    );
+  }
   for (const o of outcomes) {
     printOutcome(o, opts.dryRun);
   }
