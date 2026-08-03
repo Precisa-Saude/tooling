@@ -159,7 +159,8 @@ function normalizeSourcePaths(value: string | string[] | undefined): string {
 
 /** true quando o repo declarou este alvo como divergência deliberada. */
 export function isIgnored(target: string, manifest: PrecisaManifest): boolean {
-  return (manifest.ignoreTemplates ?? []).some((t) => t.trim() === target);
+  const alvo = target.trim();
+  return (manifest.ignoreTemplates ?? []).some((t) => t.trim() === alvo);
 }
 
 export function tokenContext(manifest: PrecisaManifest): Record<string, string> {

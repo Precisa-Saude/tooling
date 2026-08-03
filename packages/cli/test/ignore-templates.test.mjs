@@ -56,7 +56,7 @@ describe('ignoreTemplates', () => {
     writeFileSync(join(dir, ALVO), meu);
 
     // Sem declarar: o sync reescreve (comportamento atual, destrutivo).
-    roda(['sync'], dir);
+    assert.equal(roda(['sync'], dir).status, 0);
     assert.notEqual(readFileSync(join(dir, ALVO), 'utf8'), meu);
 
     // Declarando: o conteúdo local sobrevive.
@@ -65,7 +65,7 @@ describe('ignoreTemplates', () => {
       join(dir, '.precisa.json'),
       `${JSON.stringify({ ...MANIFESTO, ignoreTemplates: [ALVO] }, null, 2)}\n`,
     );
-    roda(['sync'], dir);
+    assert.equal(roda(['sync'], dir).status, 0);
     assert.equal(readFileSync(join(dir, ALVO), 'utf8'), meu);
   });
 

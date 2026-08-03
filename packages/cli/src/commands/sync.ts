@@ -30,12 +30,9 @@ export async function runSync(opts: SyncOptions): Promise<void> {
 
   // `ignoreTemplates` sai antes de qualquer escrita: são divergências que o
   // repo declarou de propósito, e `overwrite` as descartaria sem confirmação.
-  const ignored = loadTemplateManifest().filter(
-    (e) => isRequired(e.required_when, manifest) && isIgnored(e.target, manifest),
-  );
-  const entries = loadTemplateManifest().filter(
-    (e) => isRequired(e.required_when, manifest) && !isIgnored(e.target, manifest),
-  );
+  const required = loadTemplateManifest().filter((e) => isRequired(e.required_when, manifest));
+  const ignored = required.filter((e) => isIgnored(e.target, manifest));
+  const entries = required.filter((e) => !isIgnored(e.target, manifest));
   const context = tokenContext(manifest);
 
   const outcomes: ApplyOutcome[] = [];
