@@ -47,11 +47,19 @@ function repoTemporario(manifest) {
 }
 
 function roda(comando, cwd) {
-  return spawnSync(process.execPath, [BIN, ...comando], {
+  const r = spawnSync(process.execPath, [BIN, ...comando], {
     cwd,
     encoding: 'utf8',
     env: { ...process.env, NO_COLOR: '1' },
+    // O padrão do Node é 1 MiB. Estourar não lança: o spawn volta com
+    // `status: null` e saída truncada, o que faria as asserções de exit code
+    // falharem por um motivo que não tem nada a ver com o que está sendo
+    // testado. Teto folgado + checagem explícita abaixo.
+    maxBuffer: 16 * 1024 * 1024,
   });
+  assert.equal(r.error, undefined, `spawn falhou: ${r.error?.message}`);
+  assert.notEqual(r.status, null, 'processo morreu por sinal ou estouro de buffer');
+  return r;
 }
 
 after(() => {

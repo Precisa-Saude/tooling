@@ -53,11 +53,15 @@ jobs:
       # `PIPESTATUS[0]` pega o código do npx, não do `tee`.
       - name: Audit templates
         id: doctor
+        # `shell: bash` explícito: `PIPESTATUS` é bashismo. É o default em
+        # runners Linux, mas depender do default deixa o passo frágil se o
+        # workflow for reaproveitado em outro runner.
+        shell: bash
         env:
           NO_COLOR: '1'
         run: |
           set +e
-          npx --yes @precisa-saude/cli@latest doctor 2>&1 | tee /tmp/precisa-doctor.log
+          npx --yes @precisa-saude/cli@latest doctor 2>&1 | tee "$RUNNER_TEMP/precisa-doctor.log"
           echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
       # Falha barulhenta e visível quando a própria auditoria quebra. Antes
@@ -88,12 +92,20 @@ jobs:
 
             let log = '';
             try {
-              log = fs.readFileSync('/tmp/precisa-doctor.log', 'utf8').trim();
+              // `RUNNER_TEMP` em vez de `/tmp`: é limpo por job e não colide
+              // com outro job no mesmo runner (relevante em self-hosted).
+              log = fs.readFileSync(`${process.env.RUNNER_TEMP}/precisa-doctor.log`, 'utf8').trim();
             } catch {
               log = '(log indisponível)';
             }
             // Cabe folgado no limite de 65536 chars do corpo de uma issue.
-            if (log.length > 20000) log = `${log.slice(0, 20000)}\n… (truncado — ver o log completo do run)`;
+            // Corta em fronteira de linha: cada linha do doctor é um arquivo,
+            // e cortar no meio produziria um nome de arquivo pela metade.
+            const LIMITE = 20000;
+            if (log.length > LIMITE) {
+              const corte = log.lastIndexOf('\n', LIMITE);
+              log = `${log.slice(0, corte > 0 ? corte : LIMITE)}\n… (truncado — ver o log completo do run)`;
+            }
 
             const body = [
               MARKER,
