@@ -59,12 +59,18 @@ export interface PrecisaManifest {
   siteProjectName?: string;
 
   /**
-   * Path prefix (relative to repo root, trailing slash) treated as site
+   * Path prefix(es) (relative to repo root, trailing slash) treated as site
    * source for change detection in `_deploy-site.yml`. Defaults to
    * `site/` — override to `packages/site/` for monorepos where the site
    * lives under `packages/`.
+   *
+   * Aceita lista quando o site é montado a partir de mais de um diretório.
+   * Em medbench-brasil o leaderboard vem de `results/` via `import.meta.glob`:
+   * uma PR que só adiciona modelos muda o site sem tocar em `site/`, e com
+   * prefixo único o deploy era pulado em silêncio, com o CI verde. Declare
+   * todo diretório que o site lê — `['site/', 'results/']`.
    */
-  siteSourcePath?: string;
+  siteSourcePath?: string | string[];
 
   /** Public-OSS or private-internal. Controls which templates are rendered. */
   visibility: 'oss' | 'private';
@@ -118,6 +124,19 @@ export function isRequired(when: RequiredWhen, manifest: PrecisaManifest): boole
  * Build the token substitution map from a manifest. Keys are `{{TOKEN}}`
  * (without braces); values are always strings.
  */
+/**
+ * `siteSourcePath` aceita string ou lista; o workflow recebe sempre uma string
+ * separada por vírgula e faz o split. Manter a normalização aqui evita que o
+ * template precise saber de qual das duas formas o manifesto veio.
+ */
+function normalizeSourcePaths(value: string | string[] | undefined): string {
+  if (value === undefined) return 'site/';
+  return (Array.isArray(value) ? value : [value])
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .join(',');
+}
+
 export function tokenContext(manifest: PrecisaManifest): Record<string, string> {
   return {
     COMMIT_SCOPES: manifest.commitScopes.join(','),
@@ -142,7 +161,8 @@ export function tokenContext(manifest: PrecisaManifest): Record<string, string> 
     SECURITY_EMAIL: manifest.contactEmails.security,
     SITE_FILTER: manifest.siteFilter ?? '',
     SITE_PROJECT_NAME: manifest.siteProjectName ?? '',
-    SITE_SOURCE_PATH: manifest.siteSourcePath ?? 'site/',
+    // Lista vira string separada por vírgula — o workflow faz o split.
+    SITE_SOURCE_PATH: normalizeSourcePaths(manifest.siteSourcePath),
     VISIBILITY: manifest.visibility,
   };
 }
@@ -206,8 +226,22 @@ export function validateManifest(raw: unknown): ManifestValidationError[] {
   if (m.siteFilter !== undefined && typeof m.siteFilter !== 'string') {
     errors.push({ message: 'must be a string', path: 'siteFilter' });
   }
-  if (m.siteSourcePath !== undefined && typeof m.siteSourcePath !== 'string') {
-    errors.push({ message: 'must be a string', path: 'siteSourcePath' });
+  if (m.siteSourcePath !== undefined) {
+    const v = m.siteSourcePath;
+    // String vazia precisa ser rejeitada: ela normaliza para lista vazia, e
+    // uma lista vazia faz o predicado do workflow (`some`) devolver sempre
+    // false — o site nunca mais é publicado, em silêncio e com o CI verde.
+    const stringValida = typeof v === 'string' && v.trim().length > 0;
+    const listaValida =
+      Array.isArray(v) &&
+      v.length > 0 &&
+      v.every((p) => typeof p === 'string' && p.trim().length > 0);
+    if (!stringValida && !listaValida) {
+      errors.push({
+        message: 'must be a non-empty string or a non-empty array of non-empty strings',
+        path: 'siteSourcePath',
+      });
+    }
   }
   if (!m.contactEmails || typeof m.contactEmails !== 'object') {
     errors.push({ message: 'must be an object', path: 'contactEmails' });
