@@ -79,10 +79,18 @@ jobs:
             fi
           done
           if [ -n "$mismatches" ]; then
+            # Delimitador aleatório, não `EOF` literal. O conteúdo deriva de
+            # `npm view`, que é resposta de registry — entrada externa. Uma
+            # linha igual ao delimitador encerraria o bloco cedo e o resto
+            # viraria par chave=valor no `$GITHUB_OUTPUT`, injetando outputs
+            # arbitrários neste job. Com delimitador imprevisível, não há o
+            # que casar. (O `%b` abaixo expande `\n`, então basta uma
+            # sequência que sobreviva a essa expansão para tentar o ataque.)
+            delim="MISMATCHES_EOF_${RANDOM}${RANDOM}_$(date +%s)"
             {
-              echo "mismatches<<EOF"
+              echo "mismatches<<$delim"
               printf "%b" "$mismatches"
-              echo "EOF"
+              echo "$delim"
             } >> "$GITHUB_OUTPUT"
           fi
 

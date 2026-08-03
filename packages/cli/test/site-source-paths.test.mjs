@@ -52,8 +52,24 @@ describe('siteSourcePath', () => {
     assert.deepEqual(validateManifest({ ...BASE, siteSourcePath: ['site/', 'results/'] }), []);
   });
 
-  it('rejeita lista vazia e tipos errados', () => {
-    for (const ruim of [[], [123], '', 42, {}]) {
+  // Inclui os casos que só-espaço/só-vazio produzem: eles normalizariam para
+  // lista vazia, e lista vazia faz o predicado do workflow devolver sempre
+  // false — o site nunca mais publicaria, em silêncio e com o CI verde. É a
+  // classe de bug que esta mudança existe para evitar, então precisa de
+  // asserção própria, não de confiança na ordem da validação.
+  it('rejeita vazios, só-espaço e tipos errados', () => {
+    const ruins = [
+      [], // lista vazia
+      [123], // entrada não-string
+      [''], // entrada vazia na lista
+      ['  '], // entrada só-espaço na lista
+      ['site/', ''], // uma boa e uma vazia — a lista inteira é inválida
+      '', // string vazia
+      '   ', // string só-espaço
+      42,
+      {},
+    ];
+    for (const ruim of ruins) {
       const errs = validateManifest({ ...BASE, siteSourcePath: ruim });
       assert.ok(
         errs.some((e) => e.path === 'siteSourcePath'),
