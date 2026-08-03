@@ -19,6 +19,20 @@ interface DriftReport {
   target: string;
 }
 
+/**
+ * Exit codes — consumidos pelo workflow `doctor.yml`, que reporta cada caso de
+ * um jeito diferente. Colapsá-los foi o que fez o audit mensal virar ruído:
+ * "não consegui auditar" e "encontrei drift" eram o mesmo não-zero.
+ */
+export const DOCTOR_EXIT = {
+  /** Sem drift acionável. */
+  CLEAN: 0,
+  /** Drift encontrado — o doctor rodou e comparou. */
+  DRIFT: 1,
+  /** `.precisa.json` ausente ou inválido — nada foi comparado. */
+  INVALID_MANIFEST: 2,
+} as const;
+
 export async function runDoctor(): Promise<void> {
   const cwd = process.cwd();
   console.log(chalk.bold.cyan('\nprecisa doctor'));
@@ -28,7 +42,9 @@ export async function runDoctor(): Promise<void> {
     manifest = loadManifest(cwd);
   } catch (err) {
     console.error(chalk.red(`\n${(err as Error).message}`));
-    process.exit(1);
+    // Código próprio: manifesto inválido não é drift. Reportá-lo como drift
+    // manda o mantenedor rodar `sync`, que não resolve nada aqui.
+    process.exit(DOCTOR_EXIT.INVALID_MANIFEST);
   }
 
   const entries = loadTemplateManifest();
@@ -85,7 +101,17 @@ export async function runDoctor(): Promise<void> {
   console.log('');
   console.log(chalk.dim(`${oks} ok, ${warnings} warning, ${errors} error, ${infos} info`));
 
-  if (errors > 0) process.exit(1);
+  // Sai não-zero em QUALQUER drift acionável, não só em arquivo ausente.
+  //
+  // `warning` significa "sync reescreveria este arquivo" — ou seja, divergência
+  // real do template canônico. Sair 0 nesse caso tornava o audit mensal
+  // estruturalmente incapaz de reportar a única coisa que ele existe para
+  // reportar: um repo com o `ci.yml` reescrito à mão passava verde.
+  //
+  // `info` continua não-fatal de propósito: são os arquivos cuja divergência é
+  // intencional (estratégias `preserve` e `skip_if_exists`, onde o sync não
+  // sobrescreve). Falhar neles transformaria o audit em ruído permanente.
+  if (errors > 0 || warnings > 0) process.exit(DOCTOR_EXIT.DRIFT);
 }
 
 function compareContent(entry: TemplateEntry, current: string, rendered: string): DriftReport {
