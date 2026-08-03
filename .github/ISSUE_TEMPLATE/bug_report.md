@@ -1,6 +1,6 @@
 ---
-name: Bug report
-about: Algo está quebrado em um pacote publicado ou na CLI
+name: Reporte de bug
+about: Algo está quebrado
 title: '[bug] '
 labels: [bug]
 ---
@@ -11,7 +11,7 @@ labels: [bug]
 
 ## Reprodução
 
-<!-- Passos mínimos. Inclua o comando exato, pacote+versão, versões do Node/pnpm. -->
+<!-- Passos mínimos. Inclua o comando exato executado, pacote + versão, versões do Node/pnpm. -->
 
 ```bash
 # comando(s)
@@ -19,15 +19,15 @@ labels: [bug]
 
 ## Esperado
 
-<!-- O que deveria ter acontecido. -->
+<!-- O que você esperava que acontecesse. -->
 
 ## Ambiente
 
-- Pacote: `@precisa-saude/<package>@<version>`
+- Pacote + versão:
 - Node: `node --version`
 - pnpm: `pnpm --version`
 - SO: macOS / Linux / Windows
 
 ## Contexto adicional
 
-<!-- Stack trace, logs de CI, link para o repo consumidor onde isso apareceu, etc. -->
+<!-- Stack trace, logs de CI, etc. -->
