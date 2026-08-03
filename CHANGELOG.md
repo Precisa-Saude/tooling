@@ -1,3 +1,9 @@
+## [1.13.0](https://github.com/Precisa-Saude/tooling/compare/v1.12.1...v1.13.0) (2026-08-03)
+
+### Features
+
+* **cli:** ignoreTemplates — declara divergência deliberada no manifesto ([#44](https://github.com/Precisa-Saude/tooling/issues/44)) ([08e717b](https://github.com/Precisa-Saude/tooling/commit/08e717b87e2302337fbed5e73f8255883c1c8a78))
+
 ## [1.12.1](https://github.com/Precisa-Saude/tooling/compare/v1.12.0...v1.12.1) (2026-08-03)
 
 ### Bug Fixes
