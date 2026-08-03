@@ -1,17 +1,17 @@
 ---
-name: Feature request
-about: Propor uma nova regra de config, template, comando da CLI ou primitivo de UI
+name: Solicitação de feature
+about: Proponha uma nova funcionalidade ou melhoria
 title: '[feat] '
 labels: [enhancement]
 ---
 
 ## Problema
 
-<!-- Que limitação ou fricção você está enfrentando? Quais repo(s) se beneficiariam? -->
+<!-- Qual limitação ou fricção você está enfrentando? -->
 
 ## Solução proposta
 
-<!-- Rascunhe a API / template / regra. Prefira exemplos concretos a prosa. -->
+<!-- Esboce a API / comportamento. Exemplos concretos preferíveis a prosa. -->
 
 ## Alternativas consideradas
 

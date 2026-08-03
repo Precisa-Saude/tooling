@@ -3,21 +3,17 @@ import base from '@precisa-saude/eslint-config/base';
 export default [
   ...base,
   {
-    ignores: [
-      '**/dist/**',
-      '**/node_modules/**',
-      '**/.turbo/**',
-      'packages/eslint-config/base.js',
-      'packages/eslint-config/react.js',
-      'packages/eslint-config/node-backend.js',
-      'packages/eslint-config/html.js',
-    ],
-  },
-  {
-    // CLI source: console output is the primary interface.
-    files: ['packages/cli/src/**/*.ts', 'packages/worktree-cli/src/**/*.ts'],
+    // Test files are excluded from package tsconfigs (to keep tsc --noEmit
+    // tight), so disable type-aware parsing for them or ESLint errors
+    // trying to locate a project.
+    files: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*.spec.tsx', '**/__tests__/**'],
+    languageOptions: {
+      parserOptions: { project: false },
+    },
     rules: {
-      'no-console': 'off',
+      '@typescript-eslint/consistent-type-imports': 'off',
+      'max-lines': 'off',
+      'max-lines-per-function': 'off',
     },
   },
 ];

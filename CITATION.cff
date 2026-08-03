@@ -1,18 +1,8 @@
 cff-version: 1.2.0
-title: '@precisa-saude/tooling'
-message: 'Shared tooling, configs, and CLI for the Precisa Saúde ecosystem.'
+title: 'tooling'
+message: 'Se você utilizar este software, por favor cite-o conforme abaixo.'
 type: software
 authors:
-  - family-names: Lüder
-    given-names: Rafael
-    email: rafael@precisa-saude.com.br
+  - name: 'Precisa-Saude'
 repository-code: 'https://github.com/Precisa-Saude/tooling'
 license: Apache-2.0
-keywords:
-  - monorepo
-  - tooling
-  - eslint
-  - prettier
-  - typescript
-  - cli
-  - design-tokens

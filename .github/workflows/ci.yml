@@ -1,13 +1,18 @@
 name: CI/CD
 
-# Orchestrator — wires reusable workflows. Mirrors the canonical shape
-# used by datasus-brasil / fhir-brasil / medbench-brasil / platform.
-# Each concern is a reusable workflow under `.github/workflows/`:
+# Canonical CI/CD orchestrator — mirrors platform's split-workflow shape.
+# Each concern lives in its own reusable workflow under `.github/workflows/`:
 #
-#   _checks.yml  — parallel CI checks (lint, typecheck, format, build, test)
-#   _release.yml — semantic-release with packages_changed guard
-#   _publish.yml — npm publish pinned to release_sha
-#   review.yml   — automated code review (PRs only)
+#   _checks.yml       — parallel CI checks (lint, typecheck, format, build, test)
+#   _release.yml      — semantic-release with packages_changed guard
+#   _publish.yml      — npm publish pinned to release_sha
+#   _deploy-site.yml  — Cloudflare Pages deploy + Slack notify (repos with sites)
+#   review.yml        — automated Anthropic → OpenAI code review
+#   publish-tag.yml   — manual recovery (workflow_dispatch)
+#
+# Per-repo customization flows through `.precisa.json`:
+#   publishesToNpm + publishPackages[] gate the `publish` job
+#   hasSite + siteProjectName + siteFilter gate the `deploy-site` job
 
 on:
   push:
@@ -33,38 +38,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ── CI checks (every PR and push) ──────────────────────────────
   checks:
     uses: ./.github/workflows/_checks.yml
     secrets: inherit
 
+  # ── Automated code review (PR only, after checks) ──────────────
   review:
     needs: checks
     if: github.event_name == 'pull_request'
     uses: ./.github/workflows/review.yml
     with:
       pr_number: ${{ github.event.pull_request.number }}
-    secrets: inherit
-
-  release:
-    needs: checks
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    uses: ./.github/workflows/_release.yml
-    secrets: inherit
-
-  publish:
-    needs: release
-    if: needs.release.outputs.released == 'true'
-    uses: ./.github/workflows/_publish.yml
-    with:
-      release_sha: ${{ needs.release.outputs.release_sha }}
-      packages: |
-        packages/agent-instructions
-        packages/cli
-        packages/commitlint-config
-        packages/eslint-config
-        packages/prettier-config
-        packages/themes
-        packages/tsconfig
-        packages/ui
-        packages/worktree-cli
     secrets: inherit

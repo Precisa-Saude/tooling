@@ -1,26 +1,22 @@
-# Security Policy
+# Política de Segurança
 
-## Reporting a Vulnerability
+## Reportar uma Vulnerabilidade
 
-If you discover a security vulnerability in this project, please report it responsibly.
+Se você descobrir uma vulnerabilidade de segurança neste projeto, por favor reporte de forma responsável.
 
-**Do not open a public GitHub issue.**
+**Não abra uma issue pública no GitHub.**
 
-Email: **security@precisa-saude.com.br**
+Envie um e-mail para: **security@precisa-saude.com.br**
 
-Include:
+Inclua:
 
-- Description of the vulnerability
-- Steps to reproduce
-- Potential impact
-- Suggested fix (if any)
+- Descrição da vulnerabilidade
+- Passos para reproduzir
+- Impacto potencial
+- Correção sugerida (se houver)
 
-We will acknowledge receipt within 48 hours and provide a timeline for resolution.
+Confirmaremos o recebimento em até 48 horas e forneceremos um cronograma para resolução.
 
-## Scope
+## Divulgação
 
-This repository publishes shared developer tooling and configs. Security concerns may include supply-chain risks in published `@precisa-saude/*` npm packages, and vulnerabilities in bundled dependencies.
-
-## Disclosure
-
-We coordinate disclosure privately. Fixes are released via patched versions of the affected `@precisa-saude/*` package and noted in the CHANGELOG.
+A divulgação é coordenada de forma privada. Correções são lançadas no(s) pacote(s) afetado(s) e registradas no CHANGELOG.

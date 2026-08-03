@@ -1,14 +1,14 @@
-# Support
+# Suporte
 
-## Getting help
+## Como obter ajuda
 
-- **Report bugs**: [GitHub Issues](https://github.com/Precisa-Saude/tooling/issues)
-- **Request features**: [GitHub Issues](https://github.com/Precisa-Saude/tooling/issues)
-- **Questions and discussions**: [GitHub Discussions](https://github.com/Precisa-Saude/tooling/discussions)
+- **Reportar bugs**: [GitHub Issues](https://github.com/Precisa-Saude/tooling/issues)
+- **Solicitar features**: [GitHub Issues](https://github.com/Precisa-Saude/tooling/issues)
+- **Perguntas e discussões**: [GitHub Discussions](https://github.com/Precisa-Saude/tooling/discussions)
 
-## Before opening an issue
+## Antes de abrir uma issue
 
-1. Search existing issues to avoid duplicates
-2. Include a minimal reproducible example
-3. Specify the package and version (e.g. `@precisa-saude/eslint-config@1.0.0`)
-4. For CLI issues (`precisa new` / `sync` / `doctor`), include the command output and the target repo's `.precisa.json`
+1. Pesquise issues existentes para evitar duplicatas
+2. Inclua um exemplo mínimo reproduzível
+3. Especifique o pacote e a versão
+4. Inclua versões de Node/pnpm e o sistema operacional

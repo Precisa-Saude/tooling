@@ -2,9 +2,8 @@
 
 This repository follows the [AGENTS.md](https://agents.md/) convention.
 Shared rules across the precisa-saude ecosystem live in
-`packages/agent-instructions/AGENTS.md` (published as
-`@precisa-saude/agent-instructions`), and repo-specific rules live in
-`./AGENTS.md`.
+`@precisa-saude/agent-instructions` (installed as a devDependency), and
+repo-specific rules live in `./AGENTS.md`.
 
-@./packages/agent-instructions/AGENTS.md
+@./node_modules/@precisa-saude/agent-instructions/AGENTS.md
 @./AGENTS.md
