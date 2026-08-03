@@ -30,5 +30,5 @@
   },
   "nodeVersion": "22",
   "pnpmVersion": "9.15.9",
-  "ignoreTemplates": [".prettierignore", "eslint.config.js"]
+  "ignoreTemplates": [".commitlintrc.cjs", ".prettierignore", "eslint.config.js"]
 }
