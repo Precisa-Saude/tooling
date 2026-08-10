@@ -33,9 +33,16 @@ permissions:
   # via GITHUB_TOKEN no fallback de providers.
   models: read
 
+# Em branch de PR, cancelar o run anterior economiza CI e não custa nada.
+# Na branch padrão, custa: o run publica no npm, e cancelar no meio deixa a
+# tag criada sem a versão publicada. Foi o que aconteceu no fhir-brasil, onde
+# cinco tags (v0.16.6 a v0.17.3) ficaram sem publicar porque cada merge
+# cancelava o publish do merge anterior — e o commit `chore(release)` do
+# semantic-release dispara mais um run, que cancela o próprio publish que o
+# criou.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
 
 jobs:
   # ── CI checks (every PR and push) ──────────────────────────────
