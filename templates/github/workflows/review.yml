@@ -55,7 +55,8 @@ jobs:
             // inverso do risco — mudança em pipeline passava sem revisão
             // nenhuma. Dois bugs de shell chegaram à main assim (fhir-brasil
             // #70 e #75).
-            const isWorkflow = (f) => /^\.github\/workflows\/.+\.ya?ml$/.test(f);
+            const isWorkflow = (filename) =>
+              /^\.github\/workflows\/.+\.ya?ml$/.test(filename);
             const hasCode = files.some(
               f => isWorkflow(f.filename) || !ignore.some(p => p.test(f.filename)),
             );
