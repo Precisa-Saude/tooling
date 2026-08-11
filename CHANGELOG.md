@@ -1,3 +1,9 @@
+## [1.13.3](https://github.com/Precisa-Saude/tooling/compare/v1.13.2...v1.13.3) (2026-08-11)
+
+### Bug Fixes
+
+* **templates:** watch aceita pacote sem tag quando bate com o package.json ([#52](https://github.com/Precisa-Saude/tooling/issues/52)) ([6aa61f6](https://github.com/Precisa-Saude/tooling/commit/6aa61f6a42f7998bc4ae76c83363a1003b6814ce)), closes [#48](https://github.com/Precisa-Saude/tooling/issues/48) [tooling#51](https://github.com/Precisa-Saude/tooling/issues/51)
+
 ## [1.13.2](https://github.com/Precisa-Saude/tooling/compare/v1.13.1...v1.13.2) (2026-08-11)
 
 ### Bug Fixes
