@@ -1,3 +1,17 @@
+## [1.13.1](https://github.com/Precisa-Saude/tooling/compare/v1.13.0...v1.13.1) (2026-08-11)
+
+### Bug Fixes
+
+* **ci:** tooling volta a publicar no npm ([#49](https://github.com/Precisa-Saude/tooling/issues/49)) ([543af02](https://github.com/Precisa-Saude/tooling/commit/543af02c869332b67cc8ecd0b8586eb0fc2c4f75)), closes [#if](https://github.com/Precisa-Saude/tooling/issues/if) [#45](https://github.com/Precisa-Saude/tooling/issues/45) [#47](https://github.com/Precisa-Saude/tooling/issues/47) [#48](https://github.com/Precisa-Saude/tooling/issues/48) [#47](https://github.com/Precisa-Saude/tooling/issues/47) [#47](https://github.com/Precisa-Saude/tooling/issues/47) [#48](https://github.com/Precisa-Saude/tooling/issues/48)
+* **templates:** conserta o pipeline de release em duas frentes ([#47](https://github.com/Precisa-Saude/tooling/issues/47)) ([e3017ae](https://github.com/Precisa-Saude/tooling/commit/e3017aeb26149116ae3d829b546e28e4b8c130ff))
+* **templates:** publish-watch passa a olhar as duas direções ([#50](https://github.com/Precisa-Saude/tooling/issues/50)) ([bc4233f](https://github.com/Precisa-Saude/tooling/commit/bc4233fc75b346e2db421fc745e2f2a35e8e9eb5)), closes [#49](https://github.com/Precisa-Saude/tooling/issues/49)
+* **templates:** workflow passa a contar como código para o review ([#48](https://github.com/Precisa-Saude/tooling/issues/48)) ([d353478](https://github.com/Precisa-Saude/tooling/commit/d3534787bfad952235c0807eeb586d8ec2c35a85)), closes [fhir-brasil#70](https://github.com/Precisa-Saude/fhir-brasil/issues/70) [fhir-brasil#75](https://github.com/Precisa-Saude/fhir-brasil/issues/75)
+
+### Chores
+
+* **ci:** declara .commitlintrc.cjs como divergência de formatação ([#46](https://github.com/Precisa-Saude/tooling/issues/46)) ([e900b00](https://github.com/Precisa-Saude/tooling/commit/e900b007b496138b3bbad43de48ec0185c34bc95))
+* **ci:** sincroniza templates e declara divergências deliberadas ([#45](https://github.com/Precisa-Saude/tooling/issues/45)) ([7928add](https://github.com/Precisa-Saude/tooling/commit/7928add586464ca34bd0f7508b649b90809c288b))
+
 ## [1.13.0](https://github.com/Precisa-Saude/tooling/compare/v1.12.1...v1.13.0) (2026-08-03)
 
 ### Features
