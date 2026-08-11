@@ -5,7 +5,7 @@
   "visibility": "oss",
   "hasSite": false,
   "hasPackages": true,
-  "publishesToNpm": false,
+  "publishesToNpm": true,
   "commitScopes": [
     "agent-instructions",
     "cli",
@@ -30,5 +30,16 @@
   },
   "nodeVersion": "22",
   "pnpmVersion": "9.15.9",
-  "ignoreTemplates": [".commitlintrc.cjs", ".prettierignore", "eslint.config.js"]
+  "ignoreTemplates": [".commitlintrc.cjs", ".prettierignore", "eslint.config.js"],
+  "publishPackages": [
+    "packages/agent-instructions",
+    "packages/commitlint-config",
+    "packages/eslint-config",
+    "packages/prettier-config",
+    "packages/themes",
+    "packages/tsconfig",
+    "packages/ui",
+    "packages/worktree-cli",
+    "packages/cli"
+  ]
 }
