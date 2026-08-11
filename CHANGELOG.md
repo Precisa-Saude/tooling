@@ -1,3 +1,9 @@
+## [1.13.2](https://github.com/Precisa-Saude/tooling/compare/v1.13.1...v1.13.2) (2026-08-11)
+
+### Bug Fixes
+
+* **templates:** watch compara a versão do pacote, não a maior tag ([#51](https://github.com/Precisa-Saude/tooling/issues/51)) ([995541f](https://github.com/Precisa-Saude/tooling/commit/995541f7898b92497e6a84b86b87dfefae96e10a)), closes [#50](https://github.com/Precisa-Saude/tooling/issues/50) [#50](https://github.com/Precisa-Saude/tooling/issues/50)
+
 ## [1.13.1](https://github.com/Precisa-Saude/tooling/compare/v1.13.0...v1.13.1) (2026-08-11)
 
 ### Bug Fixes
