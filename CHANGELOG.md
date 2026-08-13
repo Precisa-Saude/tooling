@@ -1,3 +1,9 @@
+## [1.13.4](https://github.com/Precisa-Saude/tooling/compare/v1.13.3...v1.13.4) (2026-08-13)
+
+### Bug Fixes
+
+* **ci:** guard de release compara desde a última release, não o push ([#53](https://github.com/Precisa-Saude/tooling/issues/53)) ([d60016e](https://github.com/Precisa-Saude/tooling/commit/d60016e4621ae1d051b6655d38aeff189a2551f0))
+
 ## [1.13.3](https://github.com/Precisa-Saude/tooling/compare/v1.13.2...v1.13.3) (2026-08-11)
 
 ### Bug Fixes
