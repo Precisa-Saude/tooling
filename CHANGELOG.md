@@ -1,3 +1,9 @@
+## [1.13.5](https://github.com/Precisa-Saude/tooling/compare/v1.13.4...v1.13.5) (2026-08-14)
+
+### Bug Fixes
+
+* **templates:** dá contents:read ao job que checa o status do review ([#54](https://github.com/Precisa-Saude/tooling/issues/54)) ([d24e1a9](https://github.com/Precisa-Saude/tooling/commit/d24e1a9a93dd18e8a7e60f216c03b3c706bb0477))
+
 ## [1.13.4](https://github.com/Precisa-Saude/tooling/compare/v1.13.3...v1.13.4) (2026-08-13)
 
 ### Bug Fixes
