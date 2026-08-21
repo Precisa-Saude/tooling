@@ -9,6 +9,12 @@ name: Code Review
 # têm review automatizado. Se todos falham (ou nenhum está configurado),
 # sai sem postar review e sem emitir marker de round, de modo que a
 # próxima atividade no PR retenta fresco.
+#
+# ATENÇÃO: o marker `<!-- AUTOMATED_REVIEW_ROUND_2_COMPLETE -->` desliga o
+# review daquele PR em definitivo — pushes posteriores não reabrem nada.
+# Para forçar um novo round depois dele: apague o comentário que contém o
+# marker e dispare o ci.yml manualmente (workflow_dispatch com pr_number)
+# ou feche/reabra o PR.
 
 on:
   workflow_call:
