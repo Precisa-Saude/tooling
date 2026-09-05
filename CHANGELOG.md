@@ -1,3 +1,9 @@
+## [1.14.0](https://github.com/Precisa-Saude/tooling/compare/v1.13.5...v1.14.0) (2026-09-05)
+
+### Features
+
+* **worktree-cli:** hardlink-clona node_modules da main no setup ([#57](https://github.com/Precisa-Saude/tooling/issues/57)) ([abcb2b7](https://github.com/Precisa-Saude/tooling/commit/abcb2b7fc6a71b1af43fc39d6805af885ec9a6fa))
+
 ## [1.13.5](https://github.com/Precisa-Saude/tooling/compare/v1.13.4...v1.13.5) (2026-08-14)
 
 ### Bug Fixes
