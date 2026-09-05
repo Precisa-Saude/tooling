@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- CLI de setup: imprime progresso no console de propósito */
 import { execFileSync, spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -41,8 +42,20 @@ export async function setup({ branch, cfg, repoRoot }: SetupOptions): Promise<vo
   const entry = await allocate(cfg, branch);
 
   if (cfg.install !== false) {
-    console.log(chalk.bold('==> Installing dependencies (pnpm install)...'));
-    execFileSync('pnpm', ['install'], { cwd: wtPath, stdio: 'inherit' });
+    const seeded = seedNodeModules(repoRoot, wtPath);
+    console.log(
+      chalk.bold(
+        seeded
+          ? '==> Installing dependencies (pnpm install, node_modules pre-cloned)...'
+          : '==> Installing dependencies (pnpm install)...',
+      ),
+    );
+    // --prefer-offline: with node_modules already hardlink-cloned, install just
+    // reconciles against the lockfile and shouldn't need to hit the network.
+    execFileSync('pnpm', ['install', ...(seeded ? ['--prefer-offline'] : [])], {
+      cwd: wtPath,
+      stdio: 'inherit',
+    });
   }
 
   if (cfg.buildCommand) {
@@ -115,6 +128,31 @@ export async function setup({ branch, cfg, repoRoot }: SetupOptions): Promise<vo
   console.log('');
   console.log('To start the dev server(s):');
   console.log(`  cd ${wtPath} && precisa-worktree dev ${branch}`);
+}
+
+/**
+ * Hardlink-clones the main worktree's `node_modules` into the new worktree
+ * before install. `cp -al` shares the same inodes (near-instant, copies no
+ * bytes) — the same model pnpm itself uses when linking from the global store,
+ * so `pnpm install` afterward only reconciles the diff against the lockfile,
+ * which is close to a no-op when the branch hasn't touched deps (the common
+ * case). pnpm writes via atomic replace, so it never corrupts the main
+ * worktree's `node_modules` through a shared inode. `cp -a` preserves pnpm's
+ * relative symlinks as symlinks, so they resolve within the new worktree.
+ *
+ * Best-effort: any failure (no source, cp unavailable) returns false and the
+ * caller falls back to a normal install. Skips if the target already exists.
+ */
+export function seedNodeModules(repoRoot: string, wtPath: string): boolean {
+  const src = resolve(repoRoot, 'node_modules');
+  const dst = resolve(wtPath, 'node_modules');
+  if (!existsSync(src) || existsSync(dst)) return false;
+  try {
+    execFileSync('cp', ['-al', src, dst], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function branchExists(repoRoot: string, branch: string): boolean {
