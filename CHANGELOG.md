@@ -1,3 +1,9 @@
+## [1.14.1](https://github.com/Precisa-Saude/tooling/compare/v1.14.0...v1.14.1) (2026-09-05)
+
+### Bug Fixes
+
+* **templates:** dispatch manual do review passa pr_number como number ([#56](https://github.com/Precisa-Saude/tooling/issues/56)) ([22926e8](https://github.com/Precisa-Saude/tooling/commit/22926e86afc45fc213fa57f33b5d2b6611019fc1))
+
 ## [1.14.0](https://github.com/Precisa-Saude/tooling/compare/v1.13.5...v1.14.0) (2026-09-05)
 
 ### Features
