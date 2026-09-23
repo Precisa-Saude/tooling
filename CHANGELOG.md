@@ -1,3 +1,13 @@
+## [1.14.2](https://github.com/Precisa-Saude/tooling/compare/v1.14.1...v1.14.2) (2026-09-23)
+
+### Bug Fixes
+
+* quebra volta a gerar versão maior ([#59](https://github.com/Precisa-Saude/tooling/issues/59)) ([5bd343b](https://github.com/Precisa-Saude/tooling/commit/5bd343b9654d54bc05144acc7905a70747adc963))
+
+### Chores
+
+* **ci:** publish-watch passa de diário para semanal ([#58](https://github.com/Precisa-Saude/tooling/issues/58)) ([ce89ea7](https://github.com/Precisa-Saude/tooling/commit/ce89ea74262da289c62b45a591c58605ca7b7b53))
+
 ## [1.14.1](https://github.com/Precisa-Saude/tooling/compare/v1.14.0...v1.14.1) (2026-09-05)
 
 ### Bug Fixes
