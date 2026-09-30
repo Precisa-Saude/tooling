@@ -129,17 +129,35 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REVIEW_ROUND: ${{ needs.check-review-status.outputs.review_round }}
           PR_NUMBER: ${{ inputs.pr_number }}
+          # Caminhos que o revisor não deve ver, separados por espaço, no
+          # formato de pathspec do git (ex.: `results/** **/*.snap`). Vem de
+          # variável de repositório para o repo declarar o que é artefato
+          # gerado sem divergir deste arquivo, que o `precisa sync` reescreve.
+          REVIEW_EXCLUDE_PATHS: ${{ vars.REVIEW_EXCLUDE_PATHS }}
         run: |
           HEAD_SHA=$(gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid)
           echo "head_sha=$HEAD_SHA" >> $GITHUB_OUTPUT
           echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
 
+          # O diff sai do git local, nunca de `gh pr diff`: a API do GitHub
+          # recusa diff acima de 20.000 linhas com HTTP 406 e derruba o step
+          # antes de chegar na truncagem por bytes lá embaixo, ou seja a
+          # proteção que já existe nunca entra em ação. PR de dado gerado
+          # passa disso com facilidade. O checkout deste job usa
+          # `fetch-depth: 0`, então o histórico está disponível.
+          EXCLUDES=""
+          for padrao in $REVIEW_EXCLUDE_PATHS; do
+            EXCLUDES="$EXCLUDES :(exclude)$padrao"
+          done
+
           if [ "$REVIEW_ROUND" = "2" ]; then
-            FIRST=$(gh pr view "$PR_NUMBER" --json commits -q '.commits[0].oid')
-            git diff "$FIRST"..HEAD > pr.diff
+            RANGE="$(gh pr view "$PR_NUMBER" --json commits -q '.commits[0].oid')..HEAD"
           else
-            gh pr diff "$PR_NUMBER" > pr.diff
+            RANGE="$(gh pr view "$PR_NUMBER" --json baseRefOid -q .baseRefOid)...HEAD"
           fi
+
+          # shellcheck disable=SC2086
+          git diff "$RANGE" -- . $EXCLUDES > pr.diff
 
           gh pr view "$PR_NUMBER" --json files -q '.files[].path' > changed_files.txt
 
