@@ -1,3 +1,9 @@
+## [1.14.3](https://github.com/Precisa-Saude/tooling/compare/v1.14.2...v1.14.3) (2026-09-30)
+
+### Bug Fixes
+
+* **templates:** revisão automática não morre em PR grande ([#60](https://github.com/Precisa-Saude/tooling/issues/60)) ([878670b](https://github.com/Precisa-Saude/tooling/commit/878670b3dcb3a13f5cfc1f2afdaecc2e4f3f7c6a))
+
 ## [1.14.2](https://github.com/Precisa-Saude/tooling/compare/v1.14.1...v1.14.2) (2026-09-23)
 
 ### Bug Fixes
