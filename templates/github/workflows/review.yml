@@ -145,19 +145,36 @@ jobs:
           # proteção que já existe nunca entra em ação. PR de dado gerado
           # passa disso com facilidade. O checkout deste job usa
           # `fetch-depth: 0`, então o histórico está disponível.
-          EXCLUDES=""
+          # `set -f` durante a divisão: o pathspec é do git, não do shell. Sem
+          # isso o bash expande `results/**` contra o disco antes de o git ver,
+          # e cada padrão vira a lista de diretórios que existem no momento do
+          # checkout. Funciona por acidente enquanto o glob casa com algo e
+          # muda de comportamento quando não casa. Array para cada padrão
+          # chegar como um argumento só, sem nova divisão.
+          EXCLUDES=()
+          set -f
           for padrao in $REVIEW_EXCLUDE_PATHS; do
-            EXCLUDES="$EXCLUDES :(exclude)$padrao"
+            EXCLUDES+=( ":(exclude)$padrao" )
           done
+          set +f
 
           if [ "$REVIEW_ROUND" = "2" ]; then
-            RANGE="$(gh pr view "$PR_NUMBER" --json commits -q '.commits[0].oid')..HEAD"
+            BASE_REF=$(gh pr view "$PR_NUMBER" --json commits -q '.commits[0].oid')
           else
-            RANGE="$(gh pr view "$PR_NUMBER" --json baseRefOid -q .baseRefOid)...HEAD"
+            BASE_REF=$(gh pr view "$PR_NUMBER" --json baseRefOid -q .baseRefOid)
+          fi
+          if [ -z "$BASE_REF" ]; then
+            echo "::error title=Base do diff não resolvida::gh pr view devolveu vazio para o PR $PR_NUMBER"
+            exit 1
           fi
 
-          # shellcheck disable=SC2086
-          git diff "$RANGE" -- . $EXCLUDES > pr.diff
+          if [ "$REVIEW_ROUND" = "2" ]; then
+            RANGE="$BASE_REF..HEAD"
+          else
+            RANGE="$BASE_REF...HEAD"
+          fi
+
+          git diff "$RANGE" -- . "${EXCLUDES[@]}" > pr.diff
 
           gh pr view "$PR_NUMBER" --json files -q '.files[].path' > changed_files.txt
 
