@@ -145,6 +145,12 @@ jobs:
           # proteção que já existe nunca entra em ação. PR de dado gerado
           # passa disso com facilidade. O checkout deste job usa
           # `fetch-depth: 0`, então o histórico está disponível.
+          #
+          # `REVIEW_EXCLUDE_PATHS` vazia, que é o default, produz array vazio:
+          # nenhum pathspec de exclusão entra no comando e o revisor recebe o
+          # diff inteiro. Só repo que versiona artefato gerado precisa definir
+          # a variável.
+          #
           # `set -f` durante a divisão: o pathspec é do git, não do shell. Sem
           # isso o bash expande `results/**` contra o disco antes de o git ver,
           # e cada padrão vira a lista de diretórios que existem no momento do
