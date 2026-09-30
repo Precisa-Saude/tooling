@@ -129,17 +129,58 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REVIEW_ROUND: ${{ needs.check-review-status.outputs.review_round }}
           PR_NUMBER: ${{ inputs.pr_number }}
+          # Caminhos que o revisor não deve ver, separados por espaço, no
+          # formato de pathspec do git (ex.: `results/** **/*.snap`). Vem de
+          # variável de repositório para o repo declarar o que é artefato
+          # gerado sem divergir deste arquivo, que o `precisa sync` reescreve.
+          REVIEW_EXCLUDE_PATHS: ${{ vars.REVIEW_EXCLUDE_PATHS }}
         run: |
           HEAD_SHA=$(gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid)
           echo "head_sha=$HEAD_SHA" >> $GITHUB_OUTPUT
           echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
 
+          # O diff sai do git local, nunca de `gh pr diff`: a API do GitHub
+          # recusa diff acima de 20.000 linhas com HTTP 406 e derruba o step
+          # antes de chegar na truncagem por bytes lá embaixo, ou seja a
+          # proteção que já existe nunca entra em ação. PR de dado gerado
+          # passa disso com facilidade. O checkout deste job usa
+          # `fetch-depth: 0`, então o histórico está disponível.
+          #
+          # `REVIEW_EXCLUDE_PATHS` vazia, que é o default, produz array vazio:
+          # nenhum pathspec de exclusão entra no comando e o revisor recebe o
+          # diff inteiro. Só repo que versiona artefato gerado precisa definir
+          # a variável.
+          #
+          # `set -f` durante a divisão: o pathspec é do git, não do shell. Sem
+          # isso o bash expande `results/**` contra o disco antes de o git ver,
+          # e cada padrão vira a lista de diretórios que existem no momento do
+          # checkout. Funciona por acidente enquanto o glob casa com algo e
+          # muda de comportamento quando não casa. Array para cada padrão
+          # chegar como um argumento só, sem nova divisão.
+          EXCLUDES=()
+          set -f
+          for padrao in $REVIEW_EXCLUDE_PATHS; do
+            EXCLUDES+=( ":(exclude)$padrao" )
+          done
+          set +f
+
           if [ "$REVIEW_ROUND" = "2" ]; then
-            FIRST=$(gh pr view "$PR_NUMBER" --json commits -q '.commits[0].oid')
-            git diff "$FIRST"..HEAD > pr.diff
+            BASE_REF=$(gh pr view "$PR_NUMBER" --json commits -q '.commits[0].oid')
           else
-            gh pr diff "$PR_NUMBER" > pr.diff
+            BASE_REF=$(gh pr view "$PR_NUMBER" --json baseRefOid -q .baseRefOid)
           fi
+          if [ -z "$BASE_REF" ]; then
+            echo "::error title=Base do diff não resolvida::gh pr view devolveu vazio para o PR $PR_NUMBER"
+            exit 1
+          fi
+
+          if [ "$REVIEW_ROUND" = "2" ]; then
+            RANGE="$BASE_REF..HEAD"
+          else
+            RANGE="$BASE_REF...HEAD"
+          fi
+
+          git diff "$RANGE" -- . "${EXCLUDES[@]}" > pr.diff
 
           gh pr view "$PR_NUMBER" --json files -q '.files[].path' > changed_files.txt
 
