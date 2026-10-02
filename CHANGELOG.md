@@ -1,3 +1,9 @@
+## [1.14.4](https://github.com/Precisa-Saude/tooling/compare/v1.14.3...v1.14.4) (2026-10-02)
+
+### Bug Fixes
+
+* **templates:** pre-push roda os scripts da raiz em repo de pacote único ([#61](https://github.com/Precisa-Saude/tooling/issues/61)) ([6e50a4b](https://github.com/Precisa-Saude/tooling/commit/6e50a4bffe5906c5269a86ae152f1998926dd352))
+
 ## [1.14.3](https://github.com/Precisa-Saude/tooling/compare/v1.14.2...v1.14.3) (2026-09-30)
 
 ### Bug Fixes
