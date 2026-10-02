@@ -1,3 +1,9 @@
+## [1.16.0](https://github.com/Precisa-Saude/tooling/compare/v1.15.0...v1.16.0) (2026-10-02)
+
+### Features
+
+* **ui:** Shape e o padrão do viewBox saem públicos em @precisa-saude/ui/brand ([#63](https://github.com/Precisa-Saude/tooling/issues/63)) ([cefb36a](https://github.com/Precisa-Saude/tooling/commit/cefb36a5be293b1308203a24bff04eb9dfef0b91)), closes [platform#855](https://github.com/Precisa-Saude/platform/issues/855)
+
 ## [1.15.0](https://github.com/Precisa-Saude/tooling/compare/v1.14.4...v1.15.0) (2026-10-02)
 
 ### Features
