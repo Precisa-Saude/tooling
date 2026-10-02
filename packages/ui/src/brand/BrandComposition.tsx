@@ -6,6 +6,7 @@ import {
   COMPOSITION_HEIGHT,
   COMPOSITION_WIDTH,
   type CompositionMode,
+  DEFAULT_VIEW_BOX_X,
   generateComposition,
   mainBounds,
   mainPath,
@@ -49,7 +50,7 @@ export function BrandComposition({
   parallax = 1,
   seed = 1,
   texture = 0.16,
-  viewBoxX = 440,
+  viewBoxX = DEFAULT_VIEW_BOX_X,
 }: BrandCompositionProps) {
   const ref = useRef<SVGSVGElement>(null);
   const uid = useId().replace(/:/g, '');

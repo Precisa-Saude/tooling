@@ -15,6 +15,8 @@
 
 export const COMPOSITION_WIDTH = 1672;
 export const COMPOSITION_HEIGHT = 941;
+/** Borda esquerda padrão do viewBox: a composição começa recortada à esquerda. */
+export const DEFAULT_VIEW_BOX_X = 440;
 
 export const BRAND = {
   coral: '#F47A5C',
