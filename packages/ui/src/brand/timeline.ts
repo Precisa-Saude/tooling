@@ -18,7 +18,10 @@ export function advance(time: number, target: number, elapsed: number) {
 }
 
 export function sampleMotion(spec: ShapeMotion, time: number, scroll: number) {
-  const t = clamp((time - spec.delay) / spec.duration);
+  // Duração zero (ou negativa) é um salto no `delay`: sem isto, `0 / 0` dá NaN
+  // no instante do `delay` e o `transform` sai inválido.
+  const t =
+    spec.duration > 0 ? clamp((time - spec.delay) / spec.duration) : time >= spec.delay ? 1 : 0;
   const p = 1 - (1 - t) ** 3;
   const x = (spec.x ?? 0) * (1 - p) + scroll * (spec.drift ?? 0) * p;
   const y = (spec.y ?? 0) * (1 - p) + scroll * (spec.depth ?? 0) * p;

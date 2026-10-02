@@ -53,3 +53,31 @@ test('retângulos usam a borda mais próxima; linhas têm profundidade lateral i
   assert.match(sampleMotion(spec, 1, -1).transform, /translate\(-40 -50\)/);
   assert.equal(sampleMotion(spec, 0, 1).transform, sampleMotion(spec, 0, -1).transform);
 });
+
+test('entradas fora do esperado não produzem NaN nem passam do estado final', () => {
+  const spec = {
+    cx: 10,
+    cy: 10,
+    delay: 0.2,
+    depth: 40,
+    drift: 20,
+    duration: 0.5,
+    grow: true,
+    x: 100,
+  };
+  const final = sampleMotion(spec, 0.7, 0);
+  // Antes do delay fica no início; depois do fim, no estado final.
+  assert.equal(sampleMotion(spec, -5, 0).opacity, 0);
+  assert.deepEqual(sampleMotion(spec, 50, 0), final);
+  assert.equal(final.opacity, 1);
+  // Duração zero é um salto no delay, sem NaN.
+  for (const time of [0.19, 0.2, 0.21]) {
+    const value = sampleMotion({ ...spec, duration: 0 }, time, 0.3);
+    assert.ok(!value.transform.includes('NaN'), `NaN em t=${time}`);
+    assert.equal(value.opacity, time >= 0.2 ? 1 : 0);
+  }
+  assert.ok(!sampleMotion({ ...spec, duration: -1 }, 0.2, 0).transform.includes('NaN'));
+  // Rolagem nos extremos só desloca, sem mudar a opacidade.
+  assert.equal(sampleMotion(spec, 0.7, -1).opacity, 1);
+  assert.equal(sampleMotion(spec, 0.7, 1).opacity, 1);
+});
