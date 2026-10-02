@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": false,
+    "declarationMap": false,
+    "outDir": ".brand-check",
+    "rootDir": "src/brand",
+    "sourceMap": false
+  },
+  "include": ["src/brand"]
+}

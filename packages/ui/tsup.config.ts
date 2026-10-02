@@ -4,6 +4,7 @@ export default defineConfig({
   clean: true,
   dts: true,
   entry: {
+    'brand/index': 'src/brand/index.ts',
     'cards/index': 'src/cards/index.ts',
     'charts/index': 'src/charts/index.ts',
     'decorative/index': 'src/decorative/index.ts',

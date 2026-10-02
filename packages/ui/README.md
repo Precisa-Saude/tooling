@@ -113,3 +113,77 @@ Tree-shakable: bundle only what you import.
 ## License
 
 Apache-2.0
+
+## Composição geométrica da marca
+
+```tsx
+import { BrandComposition } from '@precisa-saude/ui/brand';
+
+export function FundoDaSecao() {
+  return (
+    <section style={{ position: 'relative', isolation: 'isolate', overflow: 'clip' }}>
+      <BrandComposition
+        anchor="top"
+        bleed={false}
+        className="fundo-marca"
+        mode="varied"
+        seed={12}
+        texture={0.16}
+        viewBoxX={0}
+      />
+      {/* Conteúdo do projeto */}
+    </section>
+  );
+}
+```
+
+```css
+.fundo-marca {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.35;
+}
+```
+
+O mesmo import atende FHIR Brasil, MedBench Brasil, DataSUS Viz e platform.
+Não requer Motion, Tailwind, assets de fotografia nem CSS adicional da biblioteca.
+O consumidor define dimensões e recorte; a composição usa coordenadas 1672 × 941.
+`mode="reference"` preserva os planos da capa, e `mode="varied"` varia a geometria
+com uma semente estável. `mirror` espelha apenas as formas; `children` aceita SVG
+em primeiro plano, por exemplo um retrato do projeto. Use `label` quando esse
+conteúdo for significativo; sem rótulo, o SVG é decorativo.
+
+- Pontos entram individualmente a cada 18 ms.
+- Círculos crescem do centro; retângulos e planos de canto deslizam da borda.
+- Trilhos e fragmentos têm deslocamentos laterais individuais durante a rolagem.
+- Saídas percorrem a mesma sequência ao contrário, inclusive se a entrada for interrompida.
+- O grão é estático, limitado aos planos sólidos e configurável por `texture` (0 a 1).
+- `parallax={0}` desativa apenas a deriva; `animated={false}` mostra a composição estática.
+- `prefers-reduced-motion: reduce` desativa ambos, inclusive ao mudar a preferência ao vivo.
+- Sem IntersectionObserver, SSR ou sem JavaScript, conserva a geometria estática completa.
+- Observadores e listeners são removidos no unmount; a aba oculta pausa a animação.
+
+### Desenvolvimento entre repositórios
+
+Antes da publicação, construa `packages/ui` neste worktree. Em platform, execute
+`node scripts/preview-shared-ui.mjs /caminho/tooling/packages/ui`. Esse utilitário
+copia apenas o build para o `node_modules` da landing e não altera o lockfile.
+Para outros consumidores, use um pacote local gerado por `pnpm pack` em um
+checkout de teste. Evite symlinks para SSR: dependências externas podem resolver
+uma segunda cópia de React no repositório de origem.
+
+Não salve caminhos absolutos no manifesto ou lockfile. Refaça o build de UI,
+atualize a cópia local e reinicie o preview após editar a biblioteca.
+
+A ordem de entrega é tooling primeiro: publicar a versão com o subpath `./brand`,
+atualizar a dependência e o lockfile de cada consumidor para essa versão real,
+e então integrar os imports. A versão publicada atual ainda não possui essa API.
+O vínculo local serve para revisão; não substitui essa atualização antes de CI/merge.
+
+Validação: `pnpm --filter @precisa-saude/ui test:coverage` compila a biblioteca,
+verifica o controlador e SSR usando o runner nativo do Node, com limites de 80%
+para linhas, funções e ramos. Não adiciona dependências de runtime ou de teste.

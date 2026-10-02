@@ -109,3 +109,6 @@ When changing `templates/**`, note in the PR which consumer repos should run `pn
 ## License
 
 Apache-2.0 — see [LICENSE](./LICENSE).
+
+A composição geométrica animada da marca é exportada por `@precisa-saude/ui/brand`.
+Consulte [uso, acessibilidade e integração entre repositórios](packages/ui/README.md#composição-geométrica-da-marca).
