@@ -2,6 +2,7 @@ import base from '@precisa-saude/eslint-config/base';
 
 export default [
   ...base,
+  { ignores: ['**/.brand-check/**'] },
   {
     // Test files are excluded from package tsconfigs (to keep tsc --noEmit
     // tight), so disable type-aware parsing for them or ESLint errors

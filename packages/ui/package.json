@@ -58,6 +58,10 @@
     "./utils": {
       "types": "./dist/utils/index.d.ts",
       "import": "./dist/utils/index.js"
+    },
+    "./brand": {
+      "types": "./dist/brand/index.d.ts",
+      "import": "./dist/brand/index.js"
     }
   },
   "main": "./dist/index.js",
@@ -68,8 +72,11 @@
   ],
   "scripts": {
     "build": "tsup",
-    "clean": "rm -rf dist .turbo",
+    "clean": "rm -rf dist .turbo .brand-check",
     "dev": "tsup --watch",
+    "test": "pnpm test:compile && node --test test/*.test.mjs",
+    "test:compile": "pnpm build && tsc -p tsconfig.brand-tests.json",
+    "test:coverage": "pnpm test:compile && node --test --experimental-test-coverage --test-coverage-include=\"**/.brand-check/*.js\" --test-coverage-lines=80 --test-coverage-branches=80 --test-coverage-functions=80 test/*.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
