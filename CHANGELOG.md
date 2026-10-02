@@ -1,3 +1,9 @@
+## [1.15.0](https://github.com/Precisa-Saude/tooling/compare/v1.14.4...v1.15.0) (2026-10-02)
+
+### Features
+
+* **ui:** compartilha composição geométrica animada da marca ([#62](https://github.com/Precisa-Saude/tooling/issues/62)) ([cc7a2cb](https://github.com/Precisa-Saude/tooling/commit/cc7a2cbf4f168ab544ee3eca30fe09321d61d94e))
+
 ## [1.14.4](https://github.com/Precisa-Saude/tooling/compare/v1.14.3...v1.14.4) (2026-10-02)
 
 ### Bug Fixes
