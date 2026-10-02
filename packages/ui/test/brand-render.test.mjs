@@ -5,10 +5,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 import {
   BrandComposition,
+  DEFAULT_VIEW_BOX_X,
   generateComposition,
   mainBounds,
   mainOrigin,
   mainPath,
+  Shape,
 } from '../.brand-check/index.js';
 
 test('geometria determinística mantém os limites da identidade em 100 sementes', () => {
@@ -69,4 +71,24 @@ test('pontos pequenos têm horários distintos; textura só acompanha planos gra
   );
   assert.doesNotMatch(plain, /feTurbulence/);
   assert.doesNotMatch(plain, /y="-2000"/);
+});
+
+test('camada própria por cima da composição entra no mesmo movimento', () => {
+  const motion = { delay: 0.18, depth: 12, duration: 0.62, y: 30 };
+  const html = renderToStaticMarkup(
+    createElement(
+      BrandComposition,
+      { seed: 3 },
+      createElement(Shape, { motion }, createElement('rect', { height: 1, width: 1 })),
+    ),
+  );
+  const match = /data-brand-motion="([^"]+)"><rect height="1" width="1"/.exec(html);
+  assert.ok(match, 'a camada própria sai com o atributo de movimento');
+  assert.deepEqual(JSON.parse(match[1].replaceAll('&quot;', '"')), motion);
+  // O padrão do viewBox é público, e não um número repetido por quem consome.
+  assert.equal(DEFAULT_VIEW_BOX_X, 440);
+  const viewBox = /viewBox="([^"]+)"/.exec(
+    renderToStaticMarkup(createElement(BrandComposition, { seed: 3 })),
+  );
+  assert.equal(Number(viewBox[1].split(' ')[0]), DEFAULT_VIEW_BOX_X);
 });
