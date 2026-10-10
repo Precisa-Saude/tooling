@@ -1,8 +1,7 @@
 # Shared agent instructions
 
 > **Single source of truth** for cross-repo conventions in the
-> precisa-saude ecosystem (fhir-brasil, medbench-brasil, datasus-brasil,
-> platform, tooling). Published as `@precisa-saude/agent-instructions`
+> precisa-saude ecosystem. Published as `@precisa-saude/agent-instructions`
 > on npm and consumed by each repo via imports in `CLAUDE.md`:
 >
 > ```markdown

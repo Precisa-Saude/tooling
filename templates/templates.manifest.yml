@@ -123,9 +123,7 @@ templates:
     merge_strategy: skip_if_exists
 
   # ─── Claude Code sub-agents ───────────────────────────────────────────────
-  # Generic agents extracted from platform's .claude/agents/. Repo-specific
-  # agents (iOS QA, UI polish, perf audit for web) stay in the consumer
-  # repo's own .claude/agents/ and remain repository-owned.
+  # Generic agents are public. Repository-specific agents remain local.
   - source: .claude/agents/debugger.md
     target: .claude/agents/debugger.md
     required_when: always
@@ -223,5 +221,10 @@ templates:
 
   - source: github/workflows/doctor.yml
     target: .github/workflows/doctor.yml
+    required_when: always
+    merge_strategy: skip_if_exists
+
+  - source: github/review-policy.json
+    target: .github/review-policy.json
     required_when: always
     merge_strategy: skip_if_exists

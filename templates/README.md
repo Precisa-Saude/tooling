@@ -26,3 +26,7 @@ precisa doctor
 
 Para atualizar comportamento compartilhado, publique uma release e revise as
 PRs de dependências. Consulte [a migração](../docs/development/versioned-tooling.md).
+
+O build recusa arquivos não declarados no manifesto e links simbólicos. Todos
+os templates são públicos. `.github/review-policy.json` começa com a revisão
+externa desabilitada; o consumidor escolhe provedores e caminhos antes de ativar.

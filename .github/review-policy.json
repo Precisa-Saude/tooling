@@ -1,0 +1,9 @@
+{
+  "enabled": true,
+  "provider": "github-models",
+  "fallbackProviders": [],
+  "includePaths": ["packages/**", "scripts/**", "templates/**", ".github/workflows/**"],
+  "excludePaths": ["**/fixtures/**"],
+  "scanForSecretsBeforeSending": true,
+  "onSensitiveContent": "block"
+}

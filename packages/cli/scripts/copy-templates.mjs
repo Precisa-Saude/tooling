@@ -1,31 +1,62 @@
 #!/usr/bin/env node
-/**
- * Copies the monorepo-root `templates/` directory into this package's
- * `dist/templates/` so it ships with the published npm package. Invoked by
- * `pnpm build` after tsup finishes.
- *
- * Kept as a plain Node script (no external deps) to avoid pulling anything
- * into the CLI's build-time graph.
- *
- * Templates become part of the published tarball — treat them as public
- * artifacts (no hardcoded repo names, no private-infra references).
- */
-import { cpSync, existsSync, rmSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import {
+  copyFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+} from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parse } from 'yaml';
 
-const here = dirname(fileURLToPath(import.meta.url));
-const packageRoot = resolve(here, '..');
-const repoRoot = resolve(packageRoot, '..', '..');
-const source = resolve(repoRoot, 'templates');
-const dest = resolve(packageRoot, 'dist', 'templates');
-
-if (!existsSync(source)) {
-  console.error(`templates directory not found at ${source}`);
-  process.exit(1);
+// Apenas fontes declaradas no manifesto entram no pacote público.
+export function copyTemplates(source, dest) {
+  const manifest = parse(readFileSync(join(source, 'templates.manifest.yml'), 'utf8'));
+  if (!Array.isArray(manifest?.templates)) throw new Error('Manifesto de templates inválido.');
+  const allowed = new Set(['templates.manifest.yml', 'README.md']);
+  for (const entry of manifest.templates) {
+    const path = entry.source;
+    if (
+      typeof path !== 'string' ||
+      !path ||
+      path.startsWith('/') ||
+      path.split('/').some((part) => !part || part === '..' || part === '.') ||
+      path.includes('\\') ||
+      path.includes('\0')
+    ) {
+      throw new Error('Caminho de template inválido.');
+    }
+    allowed.add(path);
+  }
+  const files = [];
+  function walk(relative = '') {
+    for (const name of readdirSync(join(source, relative))) {
+      const path = relative ? `${relative}/${name}` : name;
+      const stat = lstatSync(join(source, path));
+      if (stat.isSymbolicLink()) throw new Error(`Link simbólico não permitido: ${path}`);
+      if (stat.isDirectory()) walk(path);
+      else if (!stat.isFile() || !allowed.has(path))
+        throw new Error(`Arquivo não declarado: ${path}`);
+      else files.push(path);
+    }
+  }
+  walk();
+  for (const path of allowed) {
+    if (!files.includes(path)) throw new Error(`Template ausente: ${path}`);
+  }
+  // Valida tudo antes de substituir a saída do build.
+  if (existsSync(dest)) rmSync(dest, { recursive: true, force: true });
+  for (const path of files) {
+    mkdirSync(dirname(join(dest, path)), { recursive: true });
+    copyFileSync(join(source, path), join(dest, path));
+  }
+  return files.length;
 }
 
-if (existsSync(dest)) rmSync(dest, { recursive: true, force: true });
-
-cpSync(source, dest, { recursive: true });
-console.log(`Copied templates: ${source} → ${dest}`);
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  copyTemplates(resolve(packageRoot, '../../templates'), resolve(packageRoot, 'dist/templates'));
+}
