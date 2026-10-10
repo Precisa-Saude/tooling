@@ -329,9 +329,14 @@ All repos in the ecosystem share the same baseline:
 - **Renovate** for automated dependency updates
 
 Changes to any of these baselines should be proposed in `tooling` and
-rolled out to consumers via `precisa sync` / `pnpm update`. Repo-level
-overrides are allowed only when justified in the repo's local
-`AGENTS.md` with the reason for diverging.
+rolled out through versioned package and reusable-workflow updates, reviewed
+in Renovate PRs. Local configuration extends the shared packages and belongs
+to the repository. Document significant local requirements in `AGENTS.md`.
+
+Templates are used when creating repositories. To add a missing file later,
+use `precisa scaffold --only <path> --dry-run`, then repeat without dry-run.
+Existing files are preserved. Use `precisa doctor` to check required commands
+and CI wiring. Never use blanket template synchronization for maintenance.
 
 ## Commits require explicit permission
 

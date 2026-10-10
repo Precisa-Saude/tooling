@@ -19,6 +19,10 @@ name: Code Review
 on:
   workflow_call:
     inputs:
+      exclude_paths:
+        description: 'Pathspecs git a excluir da revisão, separados por espaço'
+        type: string
+        default: ''
       pr_number:
         description: 'PR number to review'
         type: number
@@ -131,9 +135,9 @@ jobs:
           PR_NUMBER: ${{ inputs.pr_number }}
           # Caminhos que o revisor não deve ver, separados por espaço, no
           # formato de pathspec do git (ex.: `results/** **/*.snap`). Vem de
-          # variável de repositório para o repo declarar o que é artefato
-          # gerado sem divergir deste arquivo, que o `precisa sync` reescreve.
-          REVIEW_EXCLUDE_PATHS: ${{ vars.REVIEW_EXCLUDE_PATHS }}
+          # input do caller, com fallback para a variável de repositório.
+          # A entrada local declara quais artefatos gerados devem ser excluídos.
+          REVIEW_EXCLUDE_PATHS: ${{ inputs.exclude_paths || vars.REVIEW_EXCLUDE_PATHS }}
         run: |
           HEAD_SHA=$(gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid)
           echo "head_sha=$HEAD_SHA" >> $GITHUB_OUTPUT

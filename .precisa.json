@@ -30,7 +30,6 @@
   },
   "nodeVersion": "22",
   "pnpmVersion": "9.15.9",
-  "ignoreTemplates": [".commitlintrc.cjs", ".prettierignore", "eslint.config.js"],
   "publishPackages": [
     "packages/agent-instructions",
     "packages/commitlint-config",

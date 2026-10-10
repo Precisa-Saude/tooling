@@ -9,7 +9,7 @@ Shared tooling, configs, design tokens, and a bootstrap CLI for the [Precisa Sa�
 | Package                                                              | Purpose                                                                                                              |
 | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | [`@precisa-saude/agent-instructions`](./packages/agent-instructions) | Single source of truth for `AGENTS.md` (shared rules for Claude Code / Cursor / Copilot across every consumer repo). |
-| [`@precisa-saude/cli`](./packages/cli)                               | The `precisa` CLI — `new`, `sync`, `doctor`.                                                                         |
+| [`@precisa-saude/cli`](./packages/cli)                               | The `precisa` CLI — `new`, `scaffold`, `doctor`.                                                                     |
 | [`@precisa-saude/commitlint-config`](./packages/commitlint-config)   | Conventional Commits + AI-attribution blocker.                                                                       |
 | [`@precisa-saude/eslint-config`](./packages/eslint-config)           | Flat ESLint 9+ config. `base` (TS libraries), `react` (apps/sites), `node-backend` (Express), `html`.                |
 | [`@precisa-saude/prettier-config`](./packages/prettier-config)       | Prettier config. Default + `/tailwind` variant.                                                                      |
@@ -40,53 +40,34 @@ Profiles:
 
 The CLI renders 35+ files in one shot. Edit `.precisa.json` afterward if your scopes or profile change.
 
-## Keeping a repo in sync
+## Atualizações compartilhadas
 
-```bash
-# Preview what would change (with diffs)
-pnpm dlx @precisa-saude/cli sync --dry-run
+Pacotes de configuração são estendidos localmente. Os workflows reutilizáveis
+ficam neste repositório; consumidores os chamam por SHA com comentário de versão.
+O Renovate propõe uma PR agrupada `precisa-tooling`, sem automerge, para revisar
+a atualização e executar o CI do consumidor antes da adoção.
 
-# Apply
-pnpm dlx @precisa-saude/cli sync
-```
+Os arquivos criados por templates pertencem ao repositório. Para adicionar um
+arquivo ausente, use `precisa scaffold --only <caminho> --dry-run`. O comando
+preserva arquivos existentes. `precisa sync` está descontinuado e não escreve.
 
-Merge strategies:
+`precisa doctor` verifica requisitos estruturais de configuração, comandos e
+integração no CI. O workflow roda em PRs e pushes e não abre issues mensais por
+diferenças de conteúdo. Lint, build e testes continuam nos jobs de CI.
 
-- `overwrite` — for files whose canonical form lives in this repo (workflows, husky hooks, dotfiles, config pointers)
-- `skip_if_exists` — for scaffold-only files (first render only)
-- `preserve` — for docs that each repo curates (`CONTRIBUTING.md`, `CONVENTIONS.md`)
+## Workflows compartilhados
 
-## Auditing drift
+| Workflow           | Responsabilidade e extensão local                                 |
+| ------------------ | ----------------------------------------------------------------- |
+| `_checks.yml`      | Checks comuns; inputs `node_version` e `test_script`              |
+| `_release.yml`     | Release, com `require_package_changes` controlado pelo consumidor |
+| `_publish.yml`     | Publicação do `release_sha` e lista explícita de pacotes          |
+| `_deploy-site.yml` | Projeto, filtro e diretórios de origem do site por inputs         |
+| `review.yml`       | Revisão, com `pr_number` e `exclude_paths`                        |
 
-```bash
-pnpm dlx @precisa-saude/cli doctor
-```
-
-Reports every manifest entry by status:
-
-- `✓` ok — content matches the rendered template
-- `i` info — differs but won't be touched by `sync`
-- `!` warning — differs and `sync` would overwrite
-- `✗` error — missing but required by the manifest profile
-
-Consumer repos ship a `doctor.yml` workflow that runs monthly and opens an issue when drift is detected.
-
-## Workflow pattern
-
-Consumer repos use a split reusable-workflow pattern:
-
-```
-ci.yml              # orchestrator — triggers, permissions, concurrency, wiring
-_checks.yml         # parallel: lint / typecheck / format / build / test + PR-title commitlint
-_release.yml        # semantic-release with packages_changed guard (if publishing)
-_publish.yml        # npm publish pinned to release_sha (if publishing)
-_deploy-site.yml    # site deploy (if the repo has a site)
-review.yml          # automated code review
-publish-tag.yml     # manual recovery: publish a specific tag (if publishing)
-doctor.yml          # monthly template drift audit
-```
-
-Tooling itself uses a standalone `release.yml` instead of `_release + _publish` — its `.precisa.json` has `publishesToNpm: false` to opt out of the split-release files.
+`ci.yml` pertence a cada consumidor e define triggers, permissões, dependências
+entre jobs e checks específicos. Os inputs novos exigem uma release que já os
+contenha. Veja [o contrato e a migração](docs/development/versioned-tooling.md).
 
 ## Known gotchas
 
@@ -96,15 +77,19 @@ Tooling itself uses a standalone `release.yml` instead of `_release + _publish` 
 - **`@precisa-saude/eslint-config/react`** default-scopes to `apps/{web,landing}`, `site/`, and `packages/ui`. For unusual layouts, use the `withFiles(['custom/**/*.tsx'])` factory export.
 - **`skipLibCheck: true`** is default in the shared `tsconfig` — rarely want to turn it off; third-party `.d.ts` churn otherwise breaks builds.
 
-## Release cadence
+## Releases
 
-Tooling's `release.yml` runs on every push to `main` (no-op when no releasable commits) and on a weekly cron (Mondays 09:00 UTC) — the cron catches packages that have only docs/CI/chore commits since the last release.
+`ci.yml` chama `_release.yml` após os checks em pushes para `main`. Commits
+relevantes em pacotes, templates ou workflows geram a versão e o changelog via
+semantic-release. `_publish.yml` publica os pacotes a partir do SHA da release,
+com o ambiente `npm-publish` preservado. Mudanças incompatíveis exigem
+`BREAKING CHANGE` e uma migração documentada.
 
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) and [CONVENTIONS.md](./CONVENTIONS.md).
 
-When changing `templates/**`, note in the PR which consumer repos should run `pnpm dlx @precisa-saude/cli sync` to absorb the change.
+Ao alterar templates ou inputs de workflows, documente os consumidores afetados e a ordem de atualização por PR.
 
 ## License
 

@@ -122,6 +122,8 @@ export async function runNew(repoName: string, opts: NewOptions): Promise<void> 
       conduct: answers.conductEmail,
       security: answers.securityEmail,
     },
+    ...(profile.publishesToNpm ? { publishPackages: ['packages/core'] } : {}),
+    ...(profile.hasSite ? { siteFilter: `@${repoName}/site`, siteProjectName: repoName } : {}),
     name: repoName,
     owner: answers.owner,
   };

@@ -1,131 +1,75 @@
 # @precisa-saude/cli
 
-The `precisa` CLI — scaffold new repos, sync existing ones, audit drift against the shared template set.
+O CLI cria repositórios e verifica os requisitos da Precisa Saúde. Os arquivos
+criados pertencem ao repositório. Configurações compartilhadas são estendidas
+por pacotes; o CI chama workflows do tooling por SHA.
 
-## Install
+## Criar um repositório
 
-Run without installing:
-
-```bash
-pnpm dlx @precisa-saude/cli <command>
-```
-
-Or install globally:
+Use uma versão publicada e exata do CLI:
 
 ```bash
-pnpm add -g @precisa-saude/cli
-precisa <command>
+npx @precisa-saude/cli@<versão> new meu-repo --profile oss-library --non-interactive
 ```
 
-## Commands
+Perfis: `oss-library`, `oss-site` e `private-app`. Revise `.precisa.json`,
+crie os pacotes declarados e ajuste os comandos do `package.json` antes do
+primeiro CI. Bibliotecas começam com `publishPackages: ["packages/core"]`;
+perfis com site começam com `siteFilter: "@<repo>/site"` e
+`siteProjectName: "<repo>"`.
 
-### `precisa new <repo-name>`
+Os templates incluem entradas de CI com referências imutáveis e a configuração
+do Renovate para propor atualizações. A versão do CLI e o SHA do tooling são
+incorporados durante o build da release. Builds locais com mudanças ainda não
+publicadas servem para desenvolvimento, não para distribuir novos consumidores.
 
-Scaffold a new repository from the shared templates.
+## Adicionar um arquivo
 
 ```bash
-precisa new my-repo --profile oss-library
-precisa new my-site --profile oss-site
-precisa new internal-tool --profile private-app
+precisa scaffold --only .editorconfig SECURITY.md --dry-run
+precisa scaffold --only .editorconfig SECURITY.md
 ```
 
-Options:
+A seleção inteira é validada antes da escrita. Somente arquivos ausentes são
+criados. Conteúdo local, inclusive configuração e documentação, é preservado.
+`ignoreTemplates` continua aceito e impede criar os alvos listados, mas não
+suprime verificações de requisitos.
 
-- `--profile <profile>` — preset. One of:
-  - `oss-library` — public repo that publishes npm packages (default)
-  - `oss-site` — public repo with a website, no npm publish
-  - `private-app` — internal repo with a website + packages, no npm publish
-- `--dry-run` — print the planned file list without writing.
+`precisa sync` foi descontinuado: imprime a orientação de migração, termina
+com código 1 e não escreve arquivos. Não há sincronização integral substituta.
 
-Interactive prompts ask for the GitHub owner, contact emails, and commit scopes. After rendering, the CLI runs `git init` and `pnpm install` in the new directory.
-
-### `precisa sync`
-
-Re-render templates against the current repo's `.precisa.json` manifest.
-
-```bash
-precisa sync            # apply
-precisa sync --dry-run  # preview (shows unified diffs)
-```
-
-Per-file merge strategies (declared in `templates/templates.manifest.yml`):
-
-- **overwrite** — replace the target; source of truth is the template.
-- **merge_json** — three-way-ish JSON merge: repo-local keys win on conflicts; template adds missing keys.
-- **preserve** — never overwrite; `sync` prints the diff as a suggestion.
-- **skip_if_exists** — create only if the target doesn't exist.
-
-Output per file:
-
-| Icon          | Meaning                                                                   |
-| ------------- | ------------------------------------------------------------------------- |
-| `+` create    | Target didn't exist; rendered from template                               |
-| `~` update    | Target existed; overwritten (dry-run shows unified diff)                  |
-| `~` merge     | JSON merge applied                                                        |
-| `i` preserve  | Target differs from template; left in place (dry-run shows would-be diff) |
-| `=` unchanged | Target already matches template                                           |
-| `s` skip      | Target exists; skip_if_exists prevented change                            |
-| `!` error     | JSON parse error or unknown merge strategy                                |
-
-### `precisa doctor`
-
-Audit the repo without writing anything.
+## Verificar requisitos
 
 ```bash
 precisa doctor
 ```
 
-Reports per template:
+A verificação é estrutural, offline e não executa código do repositório. Ela lê
+o manifesto e `package.json`, confere o pnpm fixado, a versão do Node, os
+arquivos de configuração, os pacotes declarados para publicação e os workflows
+YAML. Também procura os comandos obrigatórios nos workflows de PR, seguindo
+chamadas locais e reconhecendo a API de `_checks.yml` compartilhado.
 
-- ✓ **ok** — present and matches template
-- ! **warning** — present but differs (run `sync` to update)
-- ✗ **error** — required template is missing
-- i **info** — preserve-strategy template differs (suggestion only, not drift)
+São exigidos `lint`, `typecheck`, `format:check` e `test`. Repositórios com
+`hasPackages` também precisam de `build`. Use `requiredScripts` para acrescentar
+requisitos como `test:coverage`. Essa checagem não mede cobertura nem prova que
+um comando foi executado: os jobs de CI continuam responsáveis pela execução,
+inclusive por condições dinâmicas e pela validação efetiva de ESLint/TypeScript.
 
-Exits non-zero on any error-severity drift.
+| Código | Resultado                                   |
+| ------ | ------------------------------------------- |
+| 0      | Requisitos estruturais atendidos            |
+| 1      | Requisito pendente ou configuração inválida |
+| 2      | `.precisa.json` ausente ou inválido         |
 
-## `.precisa.json` manifest
+Personalizações de conteúdo não produzem alertas. O workflow de requisitos
+roda em PRs e pushes, sem auditoria mensal nem criação de issues.
 
-Every consumer repo declares its profile:
+## Atualizar o tooling
 
-```json
-{
-  "schemaVersion": 1,
-  "name": "my-repo",
-  "owner": "Precisa-Saude",
-  "visibility": "oss",
-  "hasSite": true,
-  "hasPackages": true,
-  "publishesToNpm": true,
-  "commitScopes": ["core", "calculators", "ocr-utils", "rnds", "docs", "ci", "deps"],
-  "contactEmails": {
-    "security": "security@precisa-saude.com.br",
-    "conduct": "conduct@precisa-saude.com.br"
-  },
-  "nodeVersion": "22",
-  "pnpmVersion": "9.15.9"
-}
-```
+Revise a PR agrupada `precisa-tooling` do Renovate. Ela inclui pacotes de
+configuração, CLI e referências aos workflows compartilhados, com automerge
+desativado. O CI valida a combinação no próprio repositório. Um rollback
+restaura os pins e o lockfile da PR anterior.
 
-The manifest is the single source of truth for which templates apply (`required_when` gates match `visibility` / `hasSite` / `hasPackages` / `publishesToNpm`) and which values get substituted into `{{TOKEN}}` placeholders.
-
-## Template tokens
-
-| Token                                                        | Source                                     |
-| ------------------------------------------------------------ | ------------------------------------------ |
-| `{{REPO_NAME}}`                                              | manifest `name`                            |
-| `{{OWNER_ORG}}`                                              | manifest `owner`                           |
-| `{{REPO_SLUG}}`                                              | `${owner}/${name}`                         |
-| `{{VISIBILITY}}`                                             | manifest `visibility`                      |
-| `{{NODE_VERSION}}`                                           | manifest `nodeVersion` (default: `22`)     |
-| `{{PNPM_VERSION}}`                                           | manifest `pnpmVersion` (default: `9.15.9`) |
-| `{{SECURITY_EMAIL}}`                                         | manifest `contactEmails.security`          |
-| `{{CONDUCT_EMAIL}}`                                          | manifest `contactEmails.conduct`           |
-| `{{COMMIT_SCOPES}}`                                          | manifest `commitScopes` (comma-joined)     |
-| `{{HAS_SITE}}` / `{{HAS_PACKAGES}}` / `{{PUBLISHES_TO_NPM}}` | boolean manifest fields                    |
-
-Unknown tokens are left untouched so missing keys are visible in output.
-
-## License
-
-Apache-2.0
+Veja o [contrato e a ordem de migração](../../docs/development/versioned-tooling.md).
