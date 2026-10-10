@@ -63,11 +63,14 @@ diferenças de conteúdo. Lint, build e testes continuam nos jobs de CI.
 | `_release.yml`     | Release, com `require_package_changes` controlado pelo consumidor |
 | `_publish.yml`     | Publicação do `release_sha` e lista explícita de pacotes          |
 | `_deploy-site.yml` | Projeto, filtro e diretórios de origem do site por inputs         |
-| `review.yml`       | Revisão, com `pr_number` e `exclude_paths`                        |
+| `review.yml`       | Revisão com política explícita, `pr_number` e exclusões           |
 
 `ci.yml` pertence a cada consumidor e define triggers, permissões, dependências
 entre jobs e checks específicos. Os inputs novos exigem uma release que já os
 contenha. Veja [o contrato e a migração](docs/development/versioned-tooling.md).
+
+Consulte [segurança e adoção dos workflows](docs/security.md) para a política de
+exportação, permissões e recuperação de publicação.
 
 ## Known gotchas
 

@@ -11,6 +11,11 @@ name: Release
 
 on:
   workflow_call:
+    secrets:
+      RELEASE_APP_ID:
+        required: true
+      RELEASE_APP_PRIVATE_KEY:
+        required: true
     inputs:
       require_package_changes:
         description: 'Only run semantic-release if packages/** or package.json changed'

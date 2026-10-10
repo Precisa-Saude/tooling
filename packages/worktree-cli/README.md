@@ -1,71 +1,60 @@
 # @precisa-saude/worktree-cli
 
-Shared `git worktree` lifecycle CLI for the Precisa Saúde ecosystem.
-Drop-in replacement for each repo's hand-rolled `scripts/worktree.sh`.
+CLI para criar e manter worktrees Git, instalar dependências e reservar portas
+para serviços locais. A configuração pertence ao `package.json` de cada
+repositório. Os exemplos abaixo são fictícios.
 
-- **One codebase, one behavior** across fhir-brasil, medbench-brasil,
-  datasus-brasil, and platform.
-- **Per-repo config** declared in `package.json` — no code fork.
-- **Single-service and multi-service** repos supported uniformly
-  (platform runs API + Web + Landing in one worktree; medbench/fhir run
-  just the site).
-- **Atomic port allocation** via a JSON registry on `/tmp/`, guarded by a
-  `mkdir`-based lock portable to macOS and Linux.
-
-## Install
+## Instalação
 
 ```bash
 pnpm add -D @precisa-saude/worktree-cli
 ```
 
-## Configure
-
-Add a `worktree` field to the repo's root `package.json`:
+## Configuração de um serviço
 
 ```json
 {
   "worktree": {
-    "directoryPrefix": "medbench-brasil",
-    "portRegistry": "/tmp/medbench-worktree-ports.json",
-    "buildCommand": "pnpm turbo run build --filter=./packages/*",
+    "directoryPrefix": "example",
+    "portRegistry": "/tmp/example-worktree-ports.json",
     "services": [
       {
         "name": "site",
-        "mainPort": 4321,
-        "featureBase": 4331,
+        "mainPort": 4000,
+        "featureBase": 4010,
         "increment": 10,
-        "pnpmFilter": "@medbench-brasil/site",
-        "logPrefix": "medbench-site"
+        "pnpmFilter": "@example/site",
+        "logPrefix": "example-site"
       }
     ]
   }
 }
 ```
 
-### Multi-service example (platform)
+## Configuração de vários serviços
 
 ```json
 {
   "worktree": {
-    "directoryPrefix": "platform",
-    "portRegistry": "/tmp/precisa-worktree-ports.json",
+    "directoryPrefix": "example",
+    "portRegistry": "/tmp/example-worktree-ports.json",
     "services": [
       {
         "name": "api",
-        "mainPort": 3000,
-        "featureBase": 3010,
+        "mainPort": 4000,
+        "featureBase": 4010,
         "increment": 10,
-        "pnpmFilter": "@precisasaude/api",
-        "logPrefix": "precisa-api",
+        "pnpmFilter": "@example/api",
+        "logPrefix": "example-api",
         "env": { "PORT": "{port}" }
       },
       {
         "name": "web",
-        "mainPort": 5173,
-        "featureBase": 5180,
+        "mainPort": 5000,
+        "featureBase": 5010,
         "increment": 10,
-        "pnpmFilter": "@precisasaude/web",
-        "logPrefix": "precisa-web",
+        "pnpmFilter": "@example/web",
+        "logPrefix": "example-web",
         "env": { "VITE_API_URL": "http://localhost:{api_port}/api" }
       }
     ],
@@ -76,78 +65,55 @@ Add a `worktree` field to the repo's root `package.json`:
         "contents": "VITE_DEV_PORT={web_port}\nVITE_API_URL=http://localhost:{api_port}/api\n"
       }
     ],
-    "inheritEnvFromMain": ["apps/api/.env.local", "apps/web/.env.local"],
     "buildCommand": "pnpm turbo run build --filter='./packages/**'"
   }
 }
 ```
 
-`inheritEnvFromMain` appends KEY=VALUE lines from the main worktree's `.env.local` files into the new worktree's corresponding files at the end of `setup`. Port keys written by `writeFiles` are NOT overwritten — only missing keys are appended. Useful when the main worktree holds long-lived dev credentials (Cognito, Stripe, S3 buckets, DynamoDB tables) that every worktree needs but that aren't worktree-scoped.
+`buildCommand` executa após `pnpm install`. Use-o quando aplicações dependem dos
+artefatos compilados de outros pacotes do workspace.
 
-`buildCommand` runs after `pnpm install` to pre-build workspace packages. Required when downstream apps load workspace deps via Node ESM (e.g. `apps/api` reading `packages/*/dist/index.js`) — without it, the API will crash with `ERR_MODULE_NOT_FOUND` on first start because `dist/` isn't populated.
+O campo opcional `inheritEnvFromMain` recebe caminhos relativos de arquivos de
+ambiente. Durante `setup`, o CLI acrescenta as chaves ausentes ao arquivo
+correspondente do novo worktree. Valores já escritos por `writeFiles` são
+preservados. Se usado, mantenha esses arquivos ignorados pelo Git e limite a
+herança às configurações necessárias ao desenvolvimento. Credenciais e detalhes
+da infraestrutura pertencem aos mecanismos privados do repositório consumidor.
 
-## Usage
-
-```bash
-precisa-worktree setup feat/my-work        # create worktree, install, allocate ports
-cd ../<prefix>-feat-my-work
-precisa-worktree dev                        # start dev servers (foreground)
-precisa-worktree dev --detach               # detached (writes to log files)
-precisa-worktree dev --force                # kill processes on conflicting ports
-precisa-worktree stop                       # kill this worktree's dev servers
-precisa-worktree logs --service=api         # tail a specific service log
-precisa-worktree list                       # show all worktrees + ports + status
-precisa-worktree teardown feat/my-work      # stop, remove, delete branch, free ports
-precisa-worktree teardown --keep-branch X   # preserve the local branch
-```
-
-Commands that take `[branch]` auto-detect from the working directory
-when invoked inside a linked worktree. In the main worktree, pass the
-branch explicitly.
-
-## Drop-in migration from `scripts/worktree.sh`
-
-Old:
-
-```bash
-./scripts/worktree.sh setup feat/my-work
-./scripts/worktree.sh dev
-./scripts/worktree.sh teardown feat/my-work
-```
-
-New:
+## Comandos
 
 ```bash
 pnpm exec precisa-worktree setup feat/my-work
-pnpm exec precisa-worktree dev
+pnpm exec precisa-worktree dev --detach
+pnpm exec precisa-worktree dev --force
+pnpm exec precisa-worktree stop
+pnpm exec precisa-worktree logs --service=api
+pnpm exec precisa-worktree list
 pnpm exec precisa-worktree teardown feat/my-work
+pnpm exec precisa-worktree teardown --keep-branch feat/my-work
 ```
 
-Or add a shim at `scripts/worktree.sh`:
+`setup` cria o worktree, instala dependências e reserva portas. `dev` inicia os
+serviços em primeiro plano; `--detach` usa arquivos de log, e `--force` encerra
+processos que ocupam as portas reservadas. `teardown` encerra serviços, remove o
+worktree e libera as portas. Use `--keep-branch` para preservar a branch local.
+
+Comandos com argumento de branch detectam o worktree atual quando executados
+em um worktree vinculado. No checkout principal, informe a branch.
+
+Um script existente pode delegar ao CLI:
 
 ```bash
 #!/usr/bin/env bash
 exec pnpm exec precisa-worktree "$@"
 ```
 
-## How port allocation works
+## Reserva de portas
 
-- Main worktree always uses `mainPort` (never allocated — reserved by convention).
-- Feature worktrees get a slot starting at 1. Slot N allocates
-  `featureBase + (N-1) * increment` for each service.
-- Slots are recycled after teardown, so long-lived repos don't drift
-  into high port numbers.
-- The registry is a JSON file on `/tmp/` (survives across sessions,
-  wiped by the OS between boots — safe default).
-- A `mkdir`-based lock serializes concurrent setup/teardown across
-  parallel agent sessions without requiring `flock` (macOS-compatible).
+O checkout principal usa `mainPort`. Worktrees recebem posições a partir de 1;
+a posição N usa `featureBase + (N - 1) * increment`. As posições são recicladas
+após `teardown`.
 
-## Design goals
-
-- **No surprise behavior change** relative to the hand-rolled scripts:
-  same port allocation algorithm, same worktree directory naming, same
-  log file paths.
-- **Fail loudly on misconfiguration**: missing config field → immediate
-  error with field name.
-- **Cross-platform**: macOS (lsof) and Linux (ss, fuser) port probing;
-  POSIX-atomic locking; no GNU-specific flags.
+O registro JSON fica no caminho configurado em `portRegistry`. Um lock por
+`mkdir` serializa alterações concorrentes em macOS e Linux. Registros em `/tmp`
+podem ser removidos pelo sistema entre reinicializações.

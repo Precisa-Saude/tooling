@@ -1,23 +1,16 @@
 name: Code Review
 
-# Reusable workflow chamado pelo ci.yml para rodar o review automatizado.
-# Tenta providers em ordem (Anthropic → OpenAI → GitHub Models) e usa o
-# primeiro que retorna 200. Qualquer não-200 dispara fallback para o
-# próximo. GitHub Models é o último degrau: usa o GITHUB_TOKEN built-in
-# + permissão `models: read`, então funciona sem nenhum segredo externo
-# — repos que não configuram ANTHROPIC_API_KEY nem OPENAI_API_KEY ainda
-# têm review automatizado. Se todos falham (ou nenhum está configurado),
-# sai sem postar review e sem emitir marker de round, de modo que a
-# próxima atividade no PR retenta fresco.
-#
-# ATENÇÃO: o marker `<!-- AUTOMATED_REVIEW_ROUND_2_COMPLETE -->` desliga o
-# review daquele PR em definitivo — pushes posteriores não reabrem nada.
-# Para forçar um novo round depois dele: apague o comentário que contém o
-# marker e dispare o ci.yml manualmente (workflow_dispatch com pr_number)
-# ou feche/reabra o PR.
+# Revisão externa exige .github/review-policy.json no commit base do PR.
+# Provedores, fallback e caminhos precisam de autorização explícita.
+# Consulte docs/security.md antes de adotar uma nova versão do workflow.
 
 on:
   workflow_call:
+    secrets:
+      ANTHROPIC_API_KEY:
+        required: false
+      OPENAI_API_KEY:
+        required: false
     inputs:
       exclude_paths:
         description: 'Pathspecs git a excluir da revisão, separados por espaço'
@@ -34,14 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions:
-      # `contents: read` é necessário para o `actions/checkout` clonar um repo
-      # privado. Em repo público o checkout funciona sem, e é por isso que a
-      # falta só aparece do outro lado: um bloco `permissions` substitui o
-      # conjunto padrão inteiro, então o que não está listado vira `none`, e o
-      # GitHub responde 404 em vez de 403 para não confirmar que o repo existe.
-      # A falha chega como "Repository not found", que manda procurar
-      # credencial em vez de permissão. Aconteceu no platform e de novo no
-      # primeiro PR do decks, os dois privados.
+      # Checkout de repositórios privados exige leitura de conteúdo.
       contents: read
       pull-requests: read
       issues: read
@@ -69,11 +55,7 @@ jobs:
               per_page: 100,
             });
             const ignore = [/\.md$/, /^docs\//, /^\.github\//, /\.json$/, /\.ya?ml$/, /\.cff$/];
-            // Workflow é código: roda shell com as credenciais do repo. Ficava
-            // de fora por casar com `^.github/` e com `.yml`, e o efeito é o
-            // inverso do risco — mudança em pipeline passava sem revisão
-            // nenhuma. Dois bugs de shell chegaram à main assim (fhir-brasil
-            // #70 e #75).
+            // Workflows executam comandos e precisam de revisão.
             const isWorkflow = (filename) =>
               /^\.github\/workflows\/.+\.ya?ml$/.test(filename);
             const hasCode = files.some(
@@ -108,14 +90,10 @@ jobs:
     if: needs.check-review-status.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    continue-on-error: true
     permissions:
       contents: read
       pull-requests: write
-      # `models: read` lets this job call GitHub Models via the built-in
-      # GITHUB_TOKEN — no external API key needed for the fallback
-      # provider. Repos that don't configure ANTHROPIC_API_KEY or
-      # OPENAI_API_KEY still get a review via GitHub Models.
+      # Só é usado quando github-models está autorizado na política.
       models: read
     env:
       ANTHROPIC_MODEL: claude-haiku-4-5-20251001
@@ -133,70 +111,113 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REVIEW_ROUND: ${{ needs.check-review-status.outputs.review_round }}
           PR_NUMBER: ${{ inputs.pr_number }}
-          # Caminhos que o revisor não deve ver, separados por espaço, no
-          # formato de pathspec do git (ex.: `results/** **/*.snap`). Vem de
-          # input do caller, com fallback para a variável de repositório.
-          # A entrada local declara quais artefatos gerados devem ser excluídos.
+          # Exclusões adicionais nunca ampliam a política da base.
           REVIEW_EXCLUDE_PATHS: ${{ inputs.exclude_paths || vars.REVIEW_EXCLUDE_PATHS }}
         run: |
-          HEAD_SHA=$(gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid)
-          echo "head_sha=$HEAD_SHA" >> $GITHUB_OUTPUT
-          echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          node << 'SCRIPT'
+          const fs = require('node:fs');
+          const { join } = require('node:path');
+          const { execFileSync } = require('node:child_process');
+          const output = (key, value) => fs.appendFileSync(process.env.GITHUB_OUTPUT, `${key}=${value}\n`);
+          const run = (command, args) => {
+            try {
+              return execFileSync(command, args, {
+                encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
+              });
+            } catch {
+              throw new Error('Falha ao preparar revisão; nenhum conteúdo foi transmitido.');
+            }
+          };
+          const api = (path) => JSON.parse(run('gh', ['api', path]));
+          const number = process.env.PR_NUMBER;
+          const repo = process.env.GITHUB_REPOSITORY;
+          if (!/^[1-9]\d*$/.test(number) || !/^[\w.-]+\/[\w.-]+$/.test(repo)) {
+            throw new Error('Contexto do PR inválido.');
+          }
+          const pr = api(`repos/${repo}/pulls/${number}`);
+          const sha = /^[a-f0-9]{40}$/;
+          if (pr.base.repo.full_name !== repo || !sha.test(pr.base.sha) || !sha.test(pr.head.sha)) {
+            throw new Error('Referências do PR inválidas.');
+          }
+          // A política vem da base revisada. Alterações no próprio PR só valem após merge.
+          const file = api(`repos/${repo}/contents/.github/review-policy.json?ref=${pr.base.sha}`);
+          if (file.type !== 'file' || file.encoding !== 'base64' || file.size > 16384) {
+            throw new Error('Política de exportação ausente ou inválida.');
+          }
+          const policy = JSON.parse(Buffer.from(file.content, 'base64').toString('utf8'));
+          const keys = ['enabled', 'provider', 'fallbackProviders', 'includePaths', 'excludePaths', 'scanForSecretsBeforeSending', 'onSensitiveContent'];
+          if (!policy || typeof policy !== 'object' || Array.isArray(policy) ||
+              typeof policy.enabled !== 'boolean' || Object.keys(policy).some(key => !keys.includes(key))) {
+            throw new Error('Política de exportação inválida.');
+          }
+          if (!policy.enabled) {
+            output('enabled', 'false');
+            console.log('Revisão externa desabilitada pela política.');
+          } else {
+            const providers = ['anthropic', 'openai', 'github-models'];
+            if (!providers.includes(policy.provider) || !Array.isArray(policy.fallbackProviders) ||
+                !policy.fallbackProviders.every(name => providers.includes(name)) ||
+                policy.scanForSecretsBeforeSending !== true || policy.onSensitiveContent !== 'block') {
+              throw new Error('Provedores ou proteção de conteúdo inválidos.');
+            }
+            const validPaths = paths => Array.isArray(paths) && paths.length <= 100 && paths.every(path =>
+              typeof path === 'string' && path.length > 0 && path.length < 512 &&
+              !/[\x00-\x20\x7f\\:]/.test(path) && !path.startsWith('/') &&
+              !path.split('/').some(segment => segment === '..' || segment === '.'));
+            if (!validPaths(policy.includePaths) || policy.includePaths.length === 0 || !validPaths(policy.excludePaths)) {
+              throw new Error('Caminhos da política inválidos.');
+            }
+            const extraExcludes = (process.env.REVIEW_EXCLUDE_PATHS || '').trim().split(/\s+/).filter(Boolean);
+            if (!validPaths(extraExcludes)) throw new Error('Exclusões adicionais inválidas.');
+            // Exclusões mínimas são obrigatórias, inclusive quando a política permite **.
+            const excludes = ['**/.env', '**/.env.*', '**/*.pem', '**/*.key', '**/*.p12', '**/*.pfx',
+              '**/id_rsa', '**/id_ed25519', '**/patient-data/**', '**/exports/**',
+              ...policy.excludePaths, ...extraExcludes];
+            run('git', ['fetch', '--no-tags', 'origin', `refs/pull/${number}/head`]);
+            if (run('git', ['rev-parse', 'FETCH_HEAD']).trim() !== pr.head.sha) {
+              throw new Error('O PR mudou durante a preparação; execute novamente.');
+            }
+            run('git', ['fetch', '--no-tags', 'origin', pr.base.sha]);
+            const range = `${pr.base.sha}...${pr.head.sha}`;
+            const paths = [...policy.includePaths.map(path => `:(top,glob)${path}`),
+              ...excludes.map(path => `:(top,glob,exclude)${path}`)];
+            const args = ['diff', '--no-ext-diff', '--no-textconv', '--no-renames'];
+            const files = run('git', [...args, '--name-only', '-z', range, '--', ...paths]).split('\0').filter(Boolean);
+            if (files.some(path => /[\x00-\x1f\x7f]/.test(path))) throw new Error('Nome de arquivo não suportado.');
+            const diff = run('git', [...args, range, '--', ...paths]);
+            // Heurística complementar às exclusões. Não identifica todos os dados sensíveis.
+            const secretPatterns = [
+              /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/,
+              /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|npm_[A-Za-z0-9]{30,})\b/,
+              /\bsk-(?:proj-|ant-api\d+-)?[A-Za-z0-9_-]{24,}\b/,
+              /\bAIza[A-Za-z0-9_-]{30,}\b/,
+              /\bxox[baprs]-[A-Za-z0-9-]{20,}\b/,
+              /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/,
+              /\beyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}/,
+              /https?:\/\/[^\s/:@]{3,}:[^\s/@]{6,}@/,
+              /(?:api[_-]?key|client[_-]?secret|access[_-]?token|password|_authToken)\s*[=:]\s*["'][A-Za-z0-9_+/=.-]{16,}["']/i,
+            ];
+            // Verifica antes de truncar, inclusive linhas removidas e nomes de arquivo.
+            if (secretPatterns.some(pattern => pattern.test(`${files.join('\n')}\n${diff}`))) {
+              throw new Error('Possível segredo detectado; exportação bloqueada sem registrar o conteúdo.');
+            }
+            const max = Number(process.env.MAX_DIFF_SIZE);
+            if (!Number.isInteger(max) || max < 1 || max > 150000) throw new Error('Limite de diff inválido.');
+            const bytes = Buffer.from(diff);
+            const inputDir = fs.mkdtempSync(join(process.env.RUNNER_TEMP, 'review-input-'));
+            fs.writeFileSync(join(inputDir, 'pr.diff'), bytes.subarray(0, max));
+            fs.writeFileSync(join(inputDir, 'changed_files.txt'), files.join('\n'));
+            output('input_dir', inputDir);
+            output('providers', JSON.stringify([...new Set([policy.provider, ...policy.fallbackProviders])]));
+            output('head_sha', pr.head.sha);
+            output('number', number);
+            output('diff_truncated', String(bytes.length > max));
+            output('enabled', String(files.length > 0 && diff.length > 0));
+          }
+          SCRIPT
 
-          # O diff sai do git local, nunca de `gh pr diff`: a API do GitHub
-          # recusa diff acima de 20.000 linhas com HTTP 406 e derruba o step
-          # antes de chegar na truncagem por bytes lá embaixo, ou seja a
-          # proteção que já existe nunca entra em ação. PR de dado gerado
-          # passa disso com facilidade. O checkout deste job usa
-          # `fetch-depth: 0`, então o histórico está disponível.
-          #
-          # `REVIEW_EXCLUDE_PATHS` vazia, que é o default, produz array vazio:
-          # nenhum pathspec de exclusão entra no comando e o revisor recebe o
-          # diff inteiro. Só repo que versiona artefato gerado precisa definir
-          # a variável.
-          #
-          # `set -f` durante a divisão: o pathspec é do git, não do shell. Sem
-          # isso o bash expande `results/**` contra o disco antes de o git ver,
-          # e cada padrão vira a lista de diretórios que existem no momento do
-          # checkout. Funciona por acidente enquanto o glob casa com algo e
-          # muda de comportamento quando não casa. Array para cada padrão
-          # chegar como um argumento só, sem nova divisão.
-          EXCLUDES=()
-          set -f
-          for padrao in $REVIEW_EXCLUDE_PATHS; do
-            EXCLUDES+=( ":(exclude)$padrao" )
-          done
-          set +f
-
-          if [ "$REVIEW_ROUND" = "2" ]; then
-            BASE_REF=$(gh pr view "$PR_NUMBER" --json commits -q '.commits[0].oid')
-          else
-            BASE_REF=$(gh pr view "$PR_NUMBER" --json baseRefOid -q .baseRefOid)
-          fi
-          if [ -z "$BASE_REF" ]; then
-            echo "::error title=Base do diff não resolvida::gh pr view devolveu vazio para o PR $PR_NUMBER"
-            exit 1
-          fi
-
-          if [ "$REVIEW_ROUND" = "2" ]; then
-            RANGE="$BASE_REF..HEAD"
-          else
-            RANGE="$BASE_REF...HEAD"
-          fi
-
-          git diff "$RANGE" -- . "${EXCLUDES[@]}" > pr.diff
-
-          gh pr view "$PR_NUMBER" --json files -q '.files[].path' > changed_files.txt
-
-          DIFF_SIZE=$(wc -c < pr.diff)
-          if [ "$DIFF_SIZE" -gt "$MAX_DIFF_SIZE" ]; then
-            head -c "$MAX_DIFF_SIZE" pr.diff > pr.diff.tmp && mv pr.diff.tmp pr.diff
-            echo "diff_truncated=true" >> $GITHUB_OUTPUT
-          else
-            echo "diff_truncated=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Call review API (with provider failover)
+      - name: Call approved review providers
+        if: steps.pr.outputs.enabled == 'true'
         id: call
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -204,14 +225,18 @@ jobs:
           # GitHub Models uses the built-in GITHUB_TOKEN; `models: read`
           # on the job permissions is what actually authorizes the call.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_INPUT_DIR: ${{ steps.pr.outputs.input_dir }}
+          REVIEW_PROVIDERS: ${{ steps.pr.outputs.providers }}
           DIFF_TRUNCATED: ${{ steps.pr.outputs.diff_truncated }}
           REVIEW_ROUND: ${{ needs.check-review-status.outputs.review_round }}
         run: |
           node << 'SCRIPT'
           const fs = require('fs');
 
-          const diff = fs.readFileSync('pr.diff', 'utf8');
-          const files = fs.readFileSync('changed_files.txt', 'utf8').trim();
+          const { join } = require('node:path');
+          const inputDir = process.env.REVIEW_INPUT_DIR;
+          const diff = fs.readFileSync(join(inputDir, 'pr.diff'), 'utf8');
+          const files = fs.readFileSync(join(inputDir, 'changed_files.txt'), 'utf8').trim();
           const round = process.env.REVIEW_ROUND;
           const truncated = process.env.DIFF_TRUNCATED === 'true';
 
@@ -356,10 +381,8 @@ jobs:
             },
           };
 
-          // Provider order: prefer Anthropic (best output quality), then
-          // OpenAI, then GitHub Models as a keyless fallback. Each
-          // provider is skipped if its auth env var isn't set.
-          const order = ['anthropic', 'openai', 'github-models'];
+          // A lista validada na base é a única autorização para transmissão.
+          const order = JSON.parse(process.env.REVIEW_PROVIDERS);
 
           const setOutput = (k, v) => {
             fs.appendFileSync(process.env.GITHUB_OUTPUT, `${k}<<EOF\n${String(v)}\nEOF\n`);
@@ -389,7 +412,7 @@ jobs:
               if (!resp.ok) {
                 return {
                   ok: false,
-                  reason: `HTTP ${resp.status}: ${p.extractError(parsed)}`,
+                  reason: `HTTP ${resp.status}`,
                   provider: name,
                   model,
                 };
@@ -398,7 +421,7 @@ jobs:
               const usage = p.extractUsage(parsed);
               return { ok: true, provider: name, model, reviewText, usage };
             } catch (e) {
-              return { ok: false, reason: `network error: ${e.message}`, provider: name, model };
+              return { ok: false, reason: 'network error', provider: name, model };
             }
           }
 
@@ -434,7 +457,7 @@ jobs:
               return;
             }
 
-            fs.writeFileSync('review.json', winner.reviewText);
+            fs.writeFileSync(join(inputDir, 'review.json'), winner.reviewText);
             setOutput('status', 'ok');
             setOutput('provider_label', providers[winner.provider].label);
             setOutput('provider_model', winner.model);
@@ -459,22 +482,36 @@ jobs:
           SCRIPT
 
       - name: Post review
+        if: steps.pr.outputs.enabled == 'true'
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          REVIEW_ROUND: ${{ needs.check-review-status.outputs.review_round }}
+          REVIEW_INPUT_DIR: ${{ steps.pr.outputs.input_dir }}
+          REVIEW_STATUS: ${{ steps.call.outputs.status }}
+          ERROR_REASON: ${{ steps.call.outputs.error_reason }}
+          PROVIDER_LABEL: ${{ steps.call.outputs.provider_label }}
+          PROVIDER_MODEL: ${{ steps.call.outputs.provider_model }}
+          PROMPT_TOKENS: ${{ steps.call.outputs.prompt_tokens }}
+          COMPLETION_TOKENS: ${{ steps.call.outputs.completion_tokens }}
+          COST_USD: ${{ steps.call.outputs.cost_usd }}
+          FELL_BACK: ${{ steps.call.outputs.fell_back }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
-            const prNumber = ${{ steps.pr.outputs.number }};
-            const headSha = '${{ steps.pr.outputs.head_sha }}';
-            const round = '${{ needs.check-review-status.outputs.review_round }}';
-            const status = `${{ steps.call.outputs.status }}`;
-            const errorReason = `${{ steps.call.outputs.error_reason }}`;
-            const providerLabel = `${{ steps.call.outputs.provider_label }}`;
-            const providerModel = `${{ steps.call.outputs.provider_model }}`;
-            const promptTokens = Number(`${{ steps.call.outputs.prompt_tokens }}` || '0');
-            const completionTokens = Number(`${{ steps.call.outputs.completion_tokens }}` || '0');
-            const costUsd = `${{ steps.call.outputs.cost_usd }}`;
-            const fellBack = `${{ steps.call.outputs.fell_back }}` === 'true';
+            const prNumber = Number(process.env.PR_NUMBER);
+            const headSha = process.env.HEAD_SHA;
+            const round = process.env.REVIEW_ROUND;
+            const status = process.env.REVIEW_STATUS;
+            const errorReason = process.env.ERROR_REASON;
+            const providerLabel = process.env.PROVIDER_LABEL;
+            const providerModel = process.env.PROVIDER_MODEL;
+            const promptTokens = Number(process.env.PROMPT_TOKENS || '0');
+            const completionTokens = Number(process.env.COMPLETION_TOKENS || '0');
+            const costUsd = process.env.COST_USD;
+            const fellBack = process.env.FELL_BACK === 'true';
 
             const fmt = (n) => n.toLocaleString('en-US');
             const costPart = costUsd ? ` | $${costUsd}` : '';
@@ -498,7 +535,7 @@ jobs:
               return;
             }
 
-            const raw = fs.readFileSync('review.json', 'utf8').trim();
+            const raw = fs.readFileSync(require('node:path').join(process.env.REVIEW_INPUT_DIR, 'review.json'), 'utf8').trim();
             let review;
             try {
               let s = raw;
