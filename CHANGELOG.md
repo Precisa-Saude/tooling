@@ -1,3 +1,15 @@
+## [3.0.0](https://github.com/Precisa-Saude/tooling/compare/v2.0.0...v3.0.0) (2026-10-10)
+
+### ⚠ BREAKING CHANGES
+
+* **ci:** review.yml exige .github/review-policy.json na base do PR.
+Consumidores devem adicionar a política antes de atualizar os pins e revisar
+permissões e entradas locais conforme docs/security.md.
+
+### Bug Fixes
+
+* **ci:** restringe publicação e exportação de código ([#65](https://github.com/Precisa-Saude/tooling/issues/65)) ([1ae0b03](https://github.com/Precisa-Saude/tooling/commit/1ae0b0395a3304a7c2cb93a679678037e6e1cc1f))
+
 ## [2.0.0](https://github.com/Precisa-Saude/tooling/compare/v1.16.0...v2.0.0) (2026-10-10)
 
 ### ⚠ BREAKING CHANGES
