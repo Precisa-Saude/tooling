@@ -1,3 +1,9 @@
+## [3.0.1](https://github.com/Precisa-Saude/tooling/compare/v3.0.0...v3.0.1) (2026-10-10)
+
+### Bug Fixes
+
+* **ci:** aplica cobertura sem omitir testes dos CLIs ([#66](https://github.com/Precisa-Saude/tooling/issues/66)) ([769d129](https://github.com/Precisa-Saude/tooling/commit/769d129db6e89e9d4bcd466a2b7e6a6ac2f4ffc0))
+
 ## [3.0.0](https://github.com/Precisa-Saude/tooling/compare/v2.0.0...v3.0.0) (2026-10-10)
 
 ### ⚠ BREAKING CHANGES
