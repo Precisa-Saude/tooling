@@ -187,3 +187,4 @@ O vínculo local serve para revisão; não substitui essa atualização antes de
 Validação: `pnpm --filter @precisa-saude/ui test:coverage` compila a biblioteca,
 verifica o controlador e SSR usando o runner nativo do Node, com limites de 80%
 para linhas, funções e ramos. Não adiciona dependências de runtime ou de teste.
+Consulte a [baseline e o escopo do gate de CI](../../docs/development/coverage-gates.md).
