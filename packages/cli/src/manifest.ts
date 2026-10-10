@@ -1,10 +1,11 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { CLI_VERSION, WORKFLOW_REF, WORKFLOW_VERSION } from './lib/baseline.js';
+
 /**
  * `.precisa.json` manifest — sits at the root of every consumer repo and
- * declares the repo's profile so `precisa sync` and `precisa doctor` know
- * which templates to render and which rules to enforce.
+ * declares scaffolding defaults and the requirements checked by doctor.
  */
 export interface PrecisaManifest {
   /** Commitlint scope enum for this repo. */
@@ -22,24 +23,7 @@ export interface PrecisaManifest {
   /** Does this repo ship a website? Controls preview-deploy workflows. */
   hasSite: boolean;
 
-  /**
-   * Alvos que este repo mantém divergentes de propósito. `doctor` e `sync`
-   * pulam cada caminho listado: o doctor não conta como drift e o sync não
-   * sobrescreve.
-   *
-   * Existe porque 39 dos 44 templates são `overwrite` e não havia como
-   * declarar customização deliberada — ela virava drift permanente, reportado
-   * todo mês, e um `sync` a descartava sem backup nem confirmação. Repos
-   * documentavam o fork num comentário no topo do arquivo, que é prosa, não
-   * mecanismo.
-   *
-   * Use com parcimônia e diga por quê: cada entrada é um arquivo que deixa de
-   * receber correção upstream. Preferir levar a mudança para o `tooling`
-   * quando ela servir a todos os repos.
-   *
-   * Exemplo: `[".github/workflows/_checks.yml"]` — job de invariante do
-   * dataset que não tem equivalente no template.
-   */
+  /** Compatibilidade: alvos que o scaffold não deve adicionar. */
   ignoreTemplates?: string[];
 
   /** Repository name (typically matches the GitHub repo name). */
@@ -62,6 +46,9 @@ export interface PrecisaManifest {
    * when `publishesToNpm: true`. Example: `["packages/core", "packages/cli"]`.
    */
   publishPackages?: string[];
+
+  /** Comandos adicionais exigidos em package.json e no CI de PR. */
+  requiredScripts?: string[];
 
   /** Schema version of this manifest file. Bump when the schema changes. */
   schemaVersion: 1;
@@ -165,6 +152,7 @@ export function isIgnored(target: string, manifest: PrecisaManifest): boolean {
 
 export function tokenContext(manifest: PrecisaManifest): Record<string, string> {
   return {
+    CLI_VERSION,
     COMMIT_SCOPES: manifest.commitScopes.join(','),
     // For human-readable docs (AGENTS.md, README) — backticked list.
     COMMIT_SCOPES_HUMAN: manifest.commitScopes.map((s) => `\`${s}\``).join(', '),
@@ -190,6 +178,8 @@ export function tokenContext(manifest: PrecisaManifest): Record<string, string> 
     // Lista vira string separada por vírgula — o workflow faz o split.
     SITE_SOURCE_PATH: normalizeSourcePaths(manifest.siteSourcePath),
     VISIBILITY: manifest.visibility,
+    WORKFLOW_REF,
+    WORKFLOW_VERSION,
   };
 }
 
@@ -221,8 +211,23 @@ export function validateManifest(raw: unknown): ManifestValidationError[] {
       errors.push({ message: 'must be a boolean', path: key });
     }
   }
-  if (!Array.isArray(m.commitScopes)) {
+  if (!Array.isArray(m.commitScopes) || m.commitScopes.some((scope) => typeof scope !== 'string')) {
     errors.push({ message: 'must be an array of strings', path: 'commitScopes' });
+  }
+  if (
+    m.requiredScripts !== undefined &&
+    (!Array.isArray(m.requiredScripts) ||
+      m.requiredScripts.some(
+        (value) => typeof value !== 'string' || !/^[a-zA-Z0-9:_-]+$/.test(value),
+      ))
+  ) {
+    errors.push({ message: 'must be an array of script names', path: 'requiredScripts' });
+  }
+  if (
+    m.nodeVersion !== undefined &&
+    (typeof m.nodeVersion !== 'string' || !/^\d+(?:\.\d+){0,2}$/.test(m.nodeVersion))
+  ) {
+    errors.push({ message: 'must be a numeric Node version', path: 'nodeVersion' });
   }
   if (m.ignoreTemplates !== undefined) {
     if (!Array.isArray(m.ignoreTemplates)) {

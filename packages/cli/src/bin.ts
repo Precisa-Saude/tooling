@@ -3,14 +3,16 @@ import { Command } from 'commander';
 
 import { runDoctor } from './commands/doctor.js';
 import { runNew } from './commands/new.js';
+import { runScaffold } from './commands/scaffold.js';
 import { runSync } from './commands/sync.js';
+import { CLI_VERSION } from './lib/baseline.js';
 
 const program = new Command();
 
 program
   .name('precisa')
-  .description('Bootstrap and sync Precisa Saúde repositories.')
-  .version('0.0.0');
+  .description('Cria repositórios e verifica os requisitos da Precisa Saúde.')
+  .version(CLI_VERSION);
 
 program
   .command('new <repo-name>')
@@ -48,8 +50,15 @@ program
   );
 
 program
+  .command('scaffold')
+  .description('Adiciona templates selecionados sem sobrescrever arquivos existentes.')
+  .requiredOption('--only <targets...>', 'caminhos dos arquivos a adicionar')
+  .option('--dry-run', 'simula a criação sem escrever', false)
+  .action(runScaffold);
+
+program
   .command('sync')
-  .description("Re-render templates against this repo's .precisa.json manifest.")
+  .description('Descontinuado. Use Renovate para atualizar e scaffold para adicionar arquivos.')
   .option('--dry-run', 'print a diff without writing', false)
   .action(async (opts: { dryRun: boolean }) => {
     await runSync(opts);
@@ -57,7 +66,7 @@ program
 
 program
   .command('doctor')
-  .description('Audit this repo against the templates and report drift.')
+  .description('Verifica manifestos, comandos e integração dos checks no CI.')
   .action(async () => {
     await runDoctor();
   });

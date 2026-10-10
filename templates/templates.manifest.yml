@@ -18,39 +18,39 @@ templates:
   - source: turbo.json
     target: turbo.json
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   # ─── TypeScript / ESLint / Prettier / Commitlint configs ──────────────────
   - source: tsconfig.json
     target: tsconfig.json
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: eslint.config.js
     target: eslint.config.js
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: commitlintrc.cjs
     target: .commitlintrc.cjs
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   # ─── Root dotfiles ────────────────────────────────────────────────────────
   - source: dotfiles/editorconfig
     target: .editorconfig
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: dotfiles/nvmrc
     target: .nvmrc
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: dotfiles/npmrc
     target: .npmrc
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: dotfiles/gitignore
     target: .gitignore
@@ -60,35 +60,35 @@ templates:
   - source: dotfiles/prettierrc
     target: .prettierrc
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: dotfiles/prettierignore
     target: .prettierignore
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: dotfiles/renovate.json
     target: renovate.json
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   # ─── Husky hooks ──────────────────────────────────────────────────────────
   - source: husky/pre-commit
     target: .husky/pre-commit
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
     executable: true
 
   - source: husky/commit-msg
     target: .husky/commit-msg
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
     executable: true
 
   - source: husky/pre-push
     target: .husky/pre-push
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
     executable: true
 
   # ─── Agent instructions ───────────────────────────────────────────────────
@@ -103,13 +103,13 @@ templates:
   - source: CLAUDE.md
     target: CLAUDE.md
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   # ─── Scripts ──────────────────────────────────────────────────────────────
   - source: scripts/worktree.sh
     target: scripts/worktree.sh
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
     executable: true
 
   # ─── Claude Code permissions baseline ─────────────────────────────────────
@@ -120,88 +120,88 @@ templates:
   - source: .claude/settings.json
     target: .claude/settings.json
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   # ─── Claude Code sub-agents ───────────────────────────────────────────────
   # Generic agents extracted from platform's .claude/agents/. Repo-specific
   # agents (iOS QA, UI polish, perf audit for web) stay in the consumer
-  # repo's own .claude/agents/ and are NOT synced by precisa sync.
+  # repo's own .claude/agents/ and remain repository-owned.
   - source: .claude/agents/debugger.md
     target: .claude/agents/debugger.md
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: .claude/agents/docs-sync.md
     target: .claude/agents/docs-sync.md
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: .claude/agents/pr-review-responder.md
     target: .claude/agents/pr-review-responder.md
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: .claude/agents/pre-commit-check.md
     target: .claude/agents/pre-commit-check.md
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: .claude/agents/refactor-scout.md
     target: .claude/agents/refactor-scout.md
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   # ─── Governance ───────────────────────────────────────────────────────────
   - source: governance/CODE_OF_CONDUCT.md
     target: CODE_OF_CONDUCT.md
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: governance/SECURITY.md
     target: SECURITY.md
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: governance/SUPPORT.md
     target: SUPPORT.md
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: governance/CITATION.cff
     target: CITATION.cff
     required_when: oss
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: governance/CONTRIBUTING.md
     target: CONTRIBUTING.md
     required_when: always
-    merge_strategy: preserve
+    merge_strategy: skip_if_exists
 
   - source: governance/CONVENTIONS.md
     target: CONVENTIONS.md
     required_when: always
-    merge_strategy: preserve
+    merge_strategy: skip_if_exists
 
   # ─── GitHub ───────────────────────────────────────────────────────────────
   - source: github/PULL_REQUEST_TEMPLATE.md
     target: .github/PULL_REQUEST_TEMPLATE.md
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: github/ISSUE_TEMPLATE/bug_report.md
     target: .github/ISSUE_TEMPLATE/bug_report.md
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: github/ISSUE_TEMPLATE/feature_request.md
     target: .github/ISSUE_TEMPLATE/feature_request.md
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: github/ISSUE_TEMPLATE/config.yml
     target: .github/ISSUE_TEMPLATE/config.yml
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   # ─── Workflows (canonical split pattern) ──────────────────────────────────
   # Orchestrator + reusable workflows. Each reusable is `workflow_call`-only;
@@ -209,44 +209,19 @@ templates:
   - source: github/workflows/ci.yml
     target: .github/workflows/ci.yml
     required_when: always
-    merge_strategy: overwrite
-
-  - source: github/workflows/_checks.yml
-    target: .github/workflows/_checks.yml
-    required_when: always
-    merge_strategy: overwrite
-
-  - source: github/workflows/review.yml
-    target: .github/workflows/review.yml
-    required_when: always
-    merge_strategy: overwrite
-
-  - source: github/workflows/_release.yml
-    target: .github/workflows/_release.yml
-    required_when: publishes_to_npm
-    merge_strategy: overwrite
-
-  - source: github/workflows/_publish.yml
-    target: .github/workflows/_publish.yml
-    required_when: publishes_to_npm
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: github/workflows/publish-tag.yml
     target: .github/workflows/publish-tag.yml
     required_when: publishes_to_npm
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: github/workflows/publish-watch.yml
     target: .github/workflows/publish-watch.yml
     required_when: publishes_to_npm
-    merge_strategy: overwrite
-
-  - source: github/workflows/_deploy-site.yml
-    target: .github/workflows/_deploy-site.yml
-    required_when: has_site
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists
 
   - source: github/workflows/doctor.yml
     target: .github/workflows/doctor.yml
     required_when: always
-    merge_strategy: overwrite
+    merge_strategy: skip_if_exists

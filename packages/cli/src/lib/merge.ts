@@ -32,7 +32,16 @@ export function applyTemplate({ cwd, dryRun, entry, rendered }: ApplyOptions): A
   const exists = existsSync(targetPath);
 
   if (!exists) {
-    if (!dryRun) writeFile(targetPath, rendered, entry.executable === true);
+    if (!dryRun) {
+      mkdirSync(dirname(targetPath), { recursive: true });
+      // A criação exclusiva também protege arquivos criados após existsSync.
+      try {
+        writeFileSync(targetPath, rendered, { flag: 'wx' });
+        if (entry.executable) chmodSync(targetPath, 0o755);
+      } catch (error) {
+        return { kind: 'error', message: (error as Error).message, target: entry.target };
+      }
+    }
     return { kind: 'create', rendered, target: entry.target };
   }
 

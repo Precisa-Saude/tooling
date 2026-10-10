@@ -106,9 +106,10 @@ jobs:
             }
             // `templates/**` conta como mudança de pacote: o cli empacota o
             // diretório templates no build, então editar um template precisa
-            // republicar o cli (senão `precisa sync` distribui o template antigo).
+            // republicar o CLI para que novos scaffolds usem esses arquivos.
             const packageChanged = filenames.some(
-              f => f.startsWith('packages/') || f.startsWith('templates/') || f === 'package.json'
+              f => f.startsWith('packages/') || f.startsWith('templates/') ||
+              f.startsWith('.github/workflows/') || f === 'package.json'
             );
             core.setOutput('packages_changed', packageChanged ? 'true' : 'false');
             core.info(`base=${base}, inspected ${filenames.length} files, packages_changed=${packageChanged}`);

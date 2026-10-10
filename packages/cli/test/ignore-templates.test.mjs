@@ -1,96 +1,65 @@
-import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { after, describe, it } from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fixture, MANIFEST, run, write } from './helpers.mjs';
 
-/**
- * `ignoreTemplates` existe porque 39 dos 44 templates são `overwrite` e não
- * havia como declarar customização deliberada: ela virava drift permanente,
- * reportado todo mês, e um `sync` a descartava sem backup. Estes testes fixam
- * as duas garantias que tornam a declaração confiável — o sync não escreve e
- * o doctor não acusa.
- */
-
-const BIN = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'bin.js');
-const ALVO = '.editorconfig';
-const temp = [];
-
-const MANIFESTO = {
-  schemaVersion: 1,
-  name: 'fixture',
-  owner: 'Precisa-Saude',
-  visibility: 'oss',
-  hasSite: false,
-  hasPackages: false,
-  publishesToNpm: false,
-  commitScopes: ['ci'],
-  contactEmails: { security: 's@example.com', conduct: 'c@example.com' },
-};
-
-function repo(manifest) {
-  const dir = mkdtempSync(join(tmpdir(), 'precisa-ignore-'));
-  temp.push(dir);
-  writeFileSync(join(dir, '.precisa.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+const dirs = [];
+const repo = (manifest) => {
+  const dir = fixture(manifest);
+  dirs.push(dir);
   return dir;
-}
+};
+after(() => dirs.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
 
-const roda = (args, cwd) =>
-  spawnSync(process.execPath, [BIN, ...args], {
-    cwd,
-    encoding: 'utf8',
-    env: { ...process.env, NO_COLOR: '1' },
-    maxBuffer: 16 * 1024 * 1024,
+describe('scaffold preserva a propriedade local', () => {
+  it('sync antigo falha com orientação e não altera arquivos', () => {
+    const dir = repo();
+    write(dir, 'SECURITY.md', 'Contato local');
+    const result = run(['sync'], dir);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /descontinuado/);
+    assert.equal(readFileSync(join(dir, 'SECURITY.md'), 'utf8'), 'Contato local');
+    assert.equal(existsSync(join(dir, '.editorconfig')), false);
   });
-
-after(() => temp.forEach((d) => rmSync(d, { force: true, recursive: true })));
-
-describe('ignoreTemplates', () => {
-  it('sync não sobrescreve alvo declarado', () => {
-    const dir = repo(MANIFESTO);
-    assert.equal(roda(['sync'], dir).status, 0);
-
-    const meu = '# fork deliberado deste repo\n';
-    writeFileSync(join(dir, ALVO), meu);
-
-    // Sem declarar: o sync reescreve (comportamento atual, destrutivo).
-    assert.equal(roda(['sync'], dir).status, 0);
-    assert.notEqual(readFileSync(join(dir, ALVO), 'utf8'), meu);
-
-    // Declarando: o conteúdo local sobrevive.
-    writeFileSync(join(dir, ALVO), meu);
-    writeFileSync(
-      join(dir, '.precisa.json'),
-      `${JSON.stringify({ ...MANIFESTO, ignoreTemplates: [ALVO] }, null, 2)}\n`,
-    );
-    assert.equal(roda(['sync'], dir).status, 0);
-    assert.equal(readFileSync(join(dir, ALVO), 'utf8'), meu);
+  it('adiciona apenas arquivos selecionados e nunca sobrescreve', () => {
+    const dir = repo();
+    assert.equal(run(['scaffold', '--only', '.editorconfig', '--dry-run'], dir).status, 0);
+    assert.equal(existsSync(join(dir, '.editorconfig')), false);
+    assert.equal(run(['scaffold', '--only', '.editorconfig'], dir).status, 0);
+    assert.equal(existsSync(join(dir, 'SECURITY.md')), false);
+    write(dir, '.editorconfig', '# customização local');
+    assert.equal(run(['scaffold', '--only', '.editorconfig'], dir).status, 0);
+    assert.equal(readFileSync(join(dir, '.editorconfig'), 'utf8'), '# customização local');
   });
-
-  it('doctor não conta alvo declarado como drift', () => {
-    const dir = repo(MANIFESTO);
-    assert.equal(roda(['sync'], dir).status, 0);
-    writeFileSync(join(dir, ALVO), '# fork deliberado\n');
-
-    // Sem declarar: drift → exit 1.
-    assert.equal(roda(['doctor'], dir).status, 1);
-
-    // Declarando: limpo → exit 0.
-    writeFileSync(
-      join(dir, '.precisa.json'),
-      `${JSON.stringify({ ...MANIFESTO, ignoreTemplates: [ALVO] }, null, 2)}\n`,
-    );
-    const { status, stdout } = roda(['doctor'], dir);
-    assert.equal(status, 0, stdout);
-    assert.match(stdout, /Divergência deliberada/);
+  it('valida toda a seleção antes de escrever', () => {
+    const dir = repo();
+    assert.equal(run(['scaffold', '--only', '.editorconfig', '../escape'], dir).status, 1);
+    assert.equal(existsSync(join(dir, '.editorconfig')), false);
+    assert.notEqual(run(['scaffold'], dir).status, 0);
   });
-
-  it('rejeita entradas vazias ou de tipo errado', () => {
-    for (const ruim of ['nao-lista', [''], ['  '], [42]]) {
-      const dir = repo({ ...MANIFESTO, ignoreTemplates: ruim });
-      assert.equal(roda(['doctor'], dir).status, 2, `deveria rejeitar ${JSON.stringify(ruim)}`);
+  it('mantém ignoreTemplates compatível sem esconder requisitos', () => {
+    const dir = repo({
+      ...MANIFEST,
+      ignoreTemplates: ['.editorconfig', '.github/workflows/ci.yml'],
+    });
+    assert.equal(run(['scaffold', '--only', '.editorconfig'], dir).status, 1);
+    rmSync(join(dir, '.github/workflows/ci.yml'));
+    assert.equal(run(['doctor'], dir).status, 1);
+  });
+  it('rejeita ignoreTemplates malformado', () => {
+    for (const value of ['invalid', [''], ['  '], [42]]) {
+      assert.equal(run(['doctor'], repo({ ...MANIFEST, ignoreTemplates: value })).status, 2);
     }
   });
+});
+
+it('o template de commitlint produz JavaScript válido', () => {
+  const dir = repo();
+  assert.equal(run(['scaffold', '--only', '.commitlintrc.cjs'], dir).status, 0);
+  const result = spawnSync(process.execPath, ['--check', join(dir, '.commitlintrc.cjs')], {
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stderr);
 });

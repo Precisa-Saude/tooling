@@ -1,113 +1,144 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { after, describe, it } from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fixture, MANIFEST, run, write } from './helpers.mjs';
 
-/**
- * Os exit codes do `doctor` são contrato com o workflow `doctor.yml`, que
- * reporta cada um de um jeito diferente (drift → issue; manifesto inválido →
- * erro de anotação; outro → falha barulhenta).
- *
- * Colapsá-los foi o bug que fez a auditoria mensal virar ruído: com o CLI
- * ausente nos repos consumidores, `pnpm exec precisa doctor` saía não-zero por
- * "command not found" e abria uma issue de "drift" por mês, em todo repo, sem
- * nunca ter comparado um template. Estes testes fixam a separação.
- */
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const BIN = resolve(HERE, '..', 'dist', 'bin.js');
-
-const MANIFEST_VALIDO = {
-  schemaVersion: 1,
-  name: 'fixture-repo',
-  owner: 'Precisa-Saude',
-  visibility: 'oss',
-  hasSite: false,
-  hasPackages: false,
-  publishesToNpm: false,
-  commitScopes: ['ci', 'docs'],
-  contactEmails: {
-    security: 'security@example.com',
-    conduct: 'conduct@example.com',
-  },
-};
-
-const temporarios = [];
-
-function repoTemporario(manifest) {
-  const dir = mkdtempSync(join(tmpdir(), 'precisa-doctor-'));
-  temporarios.push(dir);
-  if (manifest !== undefined) {
-    writeFileSync(join(dir, '.precisa.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-  }
+const dirs = [];
+const repo = (manifest) => {
+  const dir = fixture(manifest);
+  dirs.push(dir);
   return dir;
-}
+};
+after(() => dirs.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
 
-function roda(comando, cwd) {
-  const r = spawnSync(process.execPath, [BIN, ...comando], {
-    cwd,
-    encoding: 'utf8',
-    env: { ...process.env, NO_COLOR: '1' },
-    // O padrão do Node é 1 MiB. Estourar não lança: o spawn volta com
-    // `status: null` e saída truncada, o que faria as asserções de exit code
-    // falharem por um motivo que não tem nada a ver com o que está sendo
-    // testado. Teto folgado + checagem explícita abaixo.
-    maxBuffer: 16 * 1024 * 1024,
+describe('doctor verifica requisitos', () => {
+  it('distingue manifesto ausente e inválido de requisitos pendentes', () => {
+    assert.equal(run(['doctor'], repo(null)).status, 2);
+    assert.equal(run(['doctor'], repo({ ...MANIFEST, hasSite: true })).status, 2);
+    for (const value of [
+      [],
+      42,
+      { ...MANIFEST, requiredScripts: [''] },
+      { ...MANIFEST, nodeVersion: 22 },
+    ]) {
+      const dir = repo();
+      write(dir, '.precisa.json', value);
+      assert.equal(run(['doctor'], dir).status, 2);
+    }
   });
-  assert.equal(r.error, undefined, `spawn falhou: ${r.error?.message}`);
-  assert.notEqual(r.status, null, 'processo morreu por sinal ou estouro de buffer');
-  return r;
-}
-
-after(() => {
-  for (const dir of temporarios) rmSync(dir, { force: true, recursive: true });
+  it('aceita customizações e documentação local sem comparar templates', () => {
+    const dir = repo();
+    write(dir, '.editorconfig', '# configuração própria');
+    write(dir, 'SECURITY.md', 'Contato específico do produto.');
+    assert.equal(run(['doctor'], dir).status, 0);
+  });
+  it('aponta um comando ausente e um comando que não chega ao CI', () => {
+    const dir = repo();
+    const pkg = JSON.parse(readFileSync(join(dir, 'package.json')));
+    delete pkg.scripts.test;
+    write(dir, 'package.json', pkg);
+    let result = run(['doctor'], dir);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /scripts.test/);
+    pkg.scripts.test = 'node --test';
+    write(dir, 'package.json', pkg);
+    const ci = readFileSync(join(dir, '.github/workflows/ci.yml'), 'utf8');
+    write(dir, '.github/workflows/ci.yml', ci.replace('- run: pnpm test', '# pnpm test'));
+    result = run(['doctor'], dir);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /CI#test/);
+  });
+  it('detecta YAML inválido e referências locais quebradas', () => {
+    const dir = repo();
+    write(dir, '.github/workflows/ci.yml', 'on: [pull_request\n');
+    assert.equal(run(['doctor'], dir).status, 1);
+    write(
+      dir,
+      '.github/workflows/ci.yml',
+      'on: pull_request\njobs:\n  checks:\n    uses: ./.github/workflows/missing.yml\n',
+    );
+    const result = run(['doctor'], dir);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /referenciado/);
+  });
+  it('segue workflows locais, resolve inputs e termina em ciclos', () => {
+    const dir = repo();
+    const ci = readFileSync(join(dir, '.github/workflows/ci.yml'), 'utf8');
+    write(
+      dir,
+      '.github/workflows/checks.yml',
+      ci.replace('on: [pull_request, push]', 'on: workflow_call'),
+    );
+    write(
+      dir,
+      '.github/workflows/ci.yml',
+      'on: pull_request\njobs:\n  checks:\n    uses: ./.github/workflows/checks.yml\n',
+    );
+    assert.equal(run(['doctor'], dir).status, 0);
+    write(
+      dir,
+      '.github/workflows/checks.yml',
+      'on: workflow_call\njobs:\n  cycle:\n    uses: ./.github/workflows/ci.yml\n',
+    );
+    assert.equal(run(['doctor'], dir).status, 1);
+  });
+  it('exige referência imutável para checks compartilhados', () => {
+    const dir = repo();
+    const workflow =
+      'on: pull_request\njobs:\n  checks:\n    uses: Precisa-Saude/tooling/.github/workflows/_checks.yml@';
+    write(dir, '.github/workflows/ci.yml', workflow + 'main\n');
+    assert.equal(run(['doctor'], dir).status, 1);
+    write(
+      dir,
+      '.github/workflows/ci.yml',
+      workflow + '1d231f69c570aea4b70b3018a32da9ff9dd2ec1c # v1.16.0\n',
+    );
+    assert.equal(run(['doctor'], dir).status, 0);
+  });
+  it('verifica cobertura quando o repo a declara como requisito', () => {
+    const dir = repo({ ...MANIFEST, requiredScripts: ['test:coverage'] });
+    const result = run(['doctor'], dir);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /CI#test:coverage/);
+  });
+  it('recusa publicar pacote privado ou fora do repositório', () => {
+    for (const path of ['packages/private', '../outside']) {
+      const dir = repo({ ...MANIFEST, publishesToNpm: true, publishPackages: [path] });
+      write(dir, 'packages/private/package.json', { name: '@fixture/private', private: true });
+      assert.equal(run(['doctor'], dir).status, 1);
+    }
+  });
+  it('recusa configuração JSON inválida e pnpm sem versão exata', () => {
+    const dir = repo();
+    write(dir, '.prettierrc', '{');
+    assert.equal(run(['doctor'], dir).status, 1);
+    write(dir, '.prettierrc', '{}');
+    const pkg = JSON.parse(readFileSync(join(dir, 'package.json')));
+    pkg.packageManager = 'pnpm@latest';
+    write(dir, 'package.json', pkg);
+    assert.equal(run(['doctor'], dir).status, 1);
+  });
 });
 
-describe('precisa doctor — exit codes', () => {
-  it('sai 2 quando não existe .precisa.json', () => {
-    const { status, stderr } = roda(['doctor'], repoTemporario(undefined));
-    assert.equal(status, 2, 'manifesto ausente não pode ser reportado como drift');
-    assert.match(stderr, /precisa\.json/);
-  });
-
-  it('sai 2 quando o .precisa.json é inválido', () => {
-    // `hasSite: true` exige siteFilter e siteProjectName — é exatamente o
-    // estado em que medbench-brasil e fhir-brasil estavam quando o audit
-    // reportava "drift".
-    const dir = repoTemporario({ ...MANIFEST_VALIDO, hasSite: true });
-    const { status, stderr } = roda(['doctor'], dir);
-    assert.equal(status, 2, 'manifesto inválido não é drift — sync não resolve');
-    assert.match(stderr, /Invalid \.precisa\.json/);
-  });
-
-  it('sai 1 quando faltam arquivos exigidos pelo perfil', () => {
-    const { status } = roda(['doctor'], repoTemporario(MANIFEST_VALIDO));
-    assert.equal(status, 1);
-  });
-
-  it('sai 0 depois de um sync — round-trip sync→doctor é limpo', () => {
-    const dir = repoTemporario(MANIFEST_VALIDO);
-    const sync = roda(['sync'], dir);
-    assert.equal(sync.status, 0, `sync falhou: ${sync.stderr}`);
-
-    const { status, stdout } = roda(['doctor'], dir);
-    assert.equal(status, 0, `doctor deveria estar limpo após sync:\n${stdout}`);
-  });
-
-  it('sai 1 quando um arquivo `overwrite` é editado após o sync', () => {
-    const dir = repoTemporario(MANIFEST_VALIDO);
-    assert.equal(roda(['sync'], dir).status, 0);
-
-    // `.editorconfig` é `overwrite` no templates.manifest.yml: editá-lo é
-    // exatamente o drift que o sync reescreveria.
-    const alvo = join(dir, '.editorconfig');
-    writeFileSync(alvo, `${readFileSync(alvo, 'utf8')}\n# deriva local\n`);
-
-    const { status, stdout } = roda(['doctor'], dir);
-    assert.equal(status, 1, 'drift de conteúdo precisa sair não-zero');
-    assert.match(stdout, /editorconfig/);
-  });
+it('menções em echo e jobs que ignoram falhas não satisfazem um requisito', () => {
+  const dir = repo();
+  const ci = readFileSync(join(dir, '.github/workflows/ci.yml'), 'utf8');
+  write(dir, '.github/workflows/ci.yml', ci.replace('run: pnpm test', 'run: echo pnpm test'));
+  assert.equal(run(['doctor'], dir).status, 1);
+  write(
+    dir,
+    '.github/workflows/ci.yml',
+    ci.replace('  checks:', '  checks:\n    continue-on-error: true'),
+  );
+  assert.equal(run(['doctor'], dir).status, 1);
+});
+it('um workflow compartilhado precisa do comentário de versão para receber updates', () => {
+  const dir = repo();
+  write(
+    dir,
+    '.github/workflows/ci.yml',
+    'on: pull_request\njobs:\n  checks:\n    uses: Precisa-Saude/tooling/.github/workflows/_checks.yml@1d231f69c570aea4b70b3018a32da9ff9dd2ec1c\n',
+  );
+  assert.equal(run(['doctor'], dir).status, 1);
 });

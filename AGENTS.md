@@ -34,12 +34,15 @@ adding:
 - Alternatives considered
 - `devDependency` or `runtime`?
 
-## Sync after editing templates
+## Shared tooling updates
 
-Edits under `templates/**` don't propagate automatically to consumer
-repos. After changing a template, document in the PR which repo(s)
-need to run `precisa sync` to absorb the change.
+Templates scaffold repository-owned files. Never ask consumers to run a
+blanket sync. Shared behavior lives in versioned packages and reusable
+workflows; Renovate proposes updates to their pinned versions.
 
-Edits to `packages/agent-instructions/AGENTS.md` in particular: this is
-the source of truth for shared agent rules. Consumers update via
-`pnpm update @precisa-saude/agent-instructions` (or Renovate/Dependabot).
+When changing templates or workflow inputs, document the consumer rollout
+and release dependency in the PR. `precisa scaffold --only <path>` only
+adds missing files. `precisa doctor` checks repository requirements.
+
+Shared rules remain in `packages/agent-instructions/AGENTS.md`; consumers
+adopt the published version through dependency update PRs.
