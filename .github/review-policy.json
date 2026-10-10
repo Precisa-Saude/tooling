@@ -1,5 +1,5 @@
 {
-  "enabled": true,
+  "enabled": false,
   "provider": "github-models",
   "fallbackProviders": [],
   "includePaths": ["packages/**", "scripts/**", "templates/**", ".github/workflows/**"],

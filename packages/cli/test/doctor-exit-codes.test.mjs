@@ -102,6 +102,34 @@ describe('doctor verifica requisitos', () => {
     assert.equal(result.status, 1);
     assert.match(result.stdout, /CI#test:coverage/);
   });
+  it('reconhece testes e cobertura adicionais no workflow local e detecta a retirada do gate', () => {
+    const dir = repo({ ...MANIFEST, requiredScripts: ['test:coverage'] });
+    const pkg = JSON.parse(readFileSync(join(dir, 'package.json')));
+    pkg.scripts['test:coverage'] = 'node --test --experimental-test-coverage';
+    write(dir, 'package.json', pkg);
+    write(
+      dir,
+      '.github/workflows/_checks.yml',
+      readFileSync(new URL('../../../.github/workflows/_checks.yml', import.meta.url), 'utf8'),
+    );
+    const ci = `on: pull_request
+jobs:
+  checks:
+    uses: ./.github/workflows/_checks.yml
+    with:
+      test_script: test:coverage
+`;
+    write(dir, '.github/workflows/ci.yml', ci);
+    assert.equal(run(['doctor'], dir).status, 0);
+    write(
+      dir,
+      '.github/workflows/ci.yml',
+      ci.replace('test_script: test:coverage', 'test_script: test'),
+    );
+    const result = run(['doctor'], dir);
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /CI#test:coverage/);
+  });
   it('recusa publicar pacote privado ou fora do repositório', () => {
     for (const path of ['packages/private', '../outside']) {
       const dir = repo({ ...MANIFEST, publishesToNpm: true, publishPackages: [path] });

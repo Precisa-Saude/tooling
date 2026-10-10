@@ -84,8 +84,11 @@ política passam a falhar. A ordem de adoção é:
 
 Consumidores já fixados em versões anteriores mantêm o comportamento anterior
 até essa adoção. O CLI gera novos scaffolds com a política desabilitada; não
-sobrescreve arquivos existentes. O próprio tooling usa a política explícita
-versionada em `.github/review-policy.json`.
+sobrescreve arquivos existentes. O próprio tooling mantém `enabled: false` em
+`.github/review-policy.json` e não chama o job de revisão externa na entrada
+local de CI. A remoção dessa chamada impede revisão também na PR que desabilita
+a política, enquanto o commit base ainda permite GitHub Models. O workflow
+reutilizável continua exigindo autorização na base para os consumidores.
 
 Versões antigas no npm, histórico Git e cópias já baixadas preservam o conteúdo
 anterior. A limpeza desta release não remove essas cópias nem confirma ausência
