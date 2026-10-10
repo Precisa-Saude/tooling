@@ -1,3 +1,13 @@
+## [2.0.0](https://github.com/Precisa-Saude/tooling/compare/v1.16.0...v2.0.0) (2026-10-10)
+
+### ⚠ BREAKING CHANGES
+
+* **cli:** sync deixa de reescrever arquivos; use scaffold para arquivos ausentes.
+
+### Features
+
+* **cli:** adota tooling versionado e preserva arquivos locais ([#64](https://github.com/Precisa-Saude/tooling/issues/64)) ([3a4ac12](https://github.com/Precisa-Saude/tooling/commit/3a4ac12dce6d1ef9839cbf137d4d63aaab3df004))
+
 ## [1.16.0](https://github.com/Precisa-Saude/tooling/compare/v1.15.0...v1.16.0) (2026-10-02)
 
 ### Features
