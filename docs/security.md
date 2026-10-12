@@ -24,7 +24,10 @@ qualquer provedor. O workflow não instala nem executa o código do PR.
 }
 ```
 
-Provedores aceitos: `openai`, `anthropic` e `github-models`. A ordem é o provedor
+Provedores aceitos: `openai`, `anthropic`, `github-models` e `openrouter`. O
+OpenRouter recebe a chave `OPENROUTER_API_KEY` e usa o modelo da entrada
+`openrouter_model` (padrão `anthropic/claude-sonnet-5.5`); o diff passa pelo
+OpenRouter e pelo provedor do modelo escolhido. A ordem é o provedor
 principal seguido dos fallbacks declarados. Uma chave configurada não autoriza
 seu provedor automaticamente. O template começa com `enabled: false`.
 

@@ -130,6 +130,14 @@ it('usa a política da base, filtra conteúdo e nomes, inclusive renomes de arqu
   assert.doesNotMatch(diff, /PRIVATE|renamed|\.env/);
   assert.match(fs.readFileSync(join(test.dest, 'outputs'), 'utf8'), /providers=\["openai"\]/);
 });
+it('aceita o OpenRouter como provedor autorizado na política', () => {
+  const test = prepare({
+    files: { 'src/ok.ts': 'new\n' },
+    config: { ...policy, provider: 'openrouter', includePaths: ['src/**'] },
+  });
+  test.run();
+  assert.match(fs.readFileSync(join(test.dest, 'outputs'), 'utf8'), /providers=\["openrouter"\]/);
+});
 it('bloqueia política ausente, inválida ou com tentativa de ampliar pathspec', () => {
   const invalid = [
     null,
@@ -292,4 +300,42 @@ it('falha no provedor autorizado não transmite a outro provedor nem registra o 
   });
   assert.deepEqual(urls, ['https://api.openai.com/v1/chat/completions']);
   assert.doesNotMatch(logs.join('\n') + outputs.join('\n'), /PRIVATE RESPONSE CONTENT/);
+});
+it('OpenRouter recebe a chave própria e o modelo da entrada, e só ele é chamado', async () => {
+  const step = review.jobs.review.steps.find((step) => step.id === 'call');
+  const script = step.run.replace(/^node << 'SCRIPT'\n/, '').replace(/\nSCRIPT\n?$/, '');
+  const calls = [];
+  await vm.runInNewContext(script, {
+    require: (name) =>
+      name === 'node:path'
+        ? { join }
+        : { readFileSync: () => 'allowed diff', appendFileSync: () => {} },
+    process: {
+      env: {
+        REVIEW_INPUT_DIR: work,
+        REVIEW_PROVIDERS: '["openrouter"]',
+        OPENROUTER_API_KEY: 'or-key',
+        OPENROUTER_MODEL: 'anthropic/claude-sonnet-5.5',
+        OPENAI_API_KEY: 'test-key',
+        ANTHROPIC_API_KEY: 'test-key',
+        GITHUB_OUTPUT: 'outputs',
+        REVIEW_ROUND: '1',
+      },
+    },
+    console: { log: () => {} },
+    fetch: async (url, init) => {
+      calls.push({ url, auth: init.headers.Authorization, model: JSON.parse(init.body).model });
+      return { ok: false, status: 500, text: async () => '{}' };
+    },
+  });
+  assert.deepEqual(calls, [
+    {
+      url: 'https://openrouter.ai/api/v1/chat/completions',
+      auth: 'Bearer or-key',
+      model: 'anthropic/claude-sonnet-5.5',
+    },
+  ]);
+  const env = review.jobs.review.env;
+  assert.match(env.OPENROUTER_MODEL, /inputs\.openrouter_model/);
+  assert.ok(review.on.workflow_call.secrets.OPENROUTER_API_KEY);
 });
