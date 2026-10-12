@@ -52,6 +52,7 @@ jobs:
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
   # {{#if PUBLISHES_TO_NPM}}
 
   # ── Release (main only, guarded on package changes) ────────────

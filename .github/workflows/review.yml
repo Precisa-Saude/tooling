@@ -11,6 +11,8 @@ on:
         required: false
       OPENAI_API_KEY:
         required: false
+      OPENROUTER_API_KEY:
+        required: false
     inputs:
       exclude_paths:
         description: 'Pathspecs git a excluir da revisão, separados por espaço'
@@ -20,6 +22,10 @@ on:
         description: 'PR number to review'
         type: number
         required: true
+      openrouter_model:
+        description: 'Modelo do OpenRouter (id do catálogo); vazio usa o padrão do workflow'
+        type: string
+        default: ''
 
 jobs:
   check-review-status:
@@ -99,6 +105,7 @@ jobs:
       ANTHROPIC_MODEL: claude-haiku-4-5-20251001
       OPENAI_MODEL: gpt-4o-mini
       GITHUB_MODELS_MODEL: openai/gpt-4o-mini
+      OPENROUTER_MODEL: ${{ inputs.openrouter_model || 'anthropic/claude-sonnet-5.5' }}
       MAX_DIFF_SIZE: '150000'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -154,7 +161,7 @@ jobs:
             output('enabled', 'false');
             console.log('Revisão externa desabilitada pela política.');
           } else {
-            const providers = ['anthropic', 'openai', 'github-models'];
+            const providers = ['anthropic', 'openai', 'github-models', 'openrouter'];
             if (!providers.includes(policy.provider) || !Array.isArray(policy.fallbackProviders) ||
                 !policy.fallbackProviders.every(name => providers.includes(name)) ||
                 policy.scanForSecretsBeforeSending !== true || policy.onSensitiveContent !== 'block') {
@@ -222,6 +229,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           # GitHub Models uses the built-in GITHUB_TOKEN; `models: read`
           # on the job permissions is what actually authorizes the call.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -282,6 +290,9 @@ jobs:
             'gpt-4o-mini': { in: 0.15, out: 0.60 },
             'gpt-4o': { in: 2.50, out: 10.00 },
             'gpt-5-mini': { in: 0.25, out: 2.00 },
+            // OpenRouter, ids do catálogo (preço por milhão de tokens em 12/10/2026).
+            'anthropic/claude-sonnet-5.5': { in: 2.00, out: 10.00 },
+            'anthropic/claude-haiku-5.5': { in: 0.10, out: 0.50 },
           };
 
           function computeCost(model, promptTokens, completionTokens) {
@@ -358,6 +369,37 @@ jobs:
               defaultModel: 'openai/gpt-4o-mini',
               build: (model, key) => ({
                 url: 'https://models.github.ai/inference/chat/completions',
+                headers: {
+                  'content-type': 'application/json',
+                  Authorization: `Bearer ${key}`,
+                },
+                body: JSON.stringify({
+                  model,
+                  max_tokens: 8192,
+                  messages: [
+                    { role: 'system', content: system },
+                    { role: 'user', content: user },
+                  ],
+                  response_format: { type: 'json_object' },
+                }),
+              }),
+              extractText: (r) => r?.choices?.[0]?.message?.content ?? '',
+              extractUsage: (r) => ({
+                prompt_tokens: r?.usage?.prompt_tokens ?? 0,
+                completion_tokens: r?.usage?.completion_tokens ?? 0,
+              }),
+              extractError: (r) => r?.error?.message ?? 'see workflow logs',
+            },
+            // OpenRouter: API compatível com a da OpenAI, com modelos de vários
+            // provedores pelo id do catálogo (anthropic/claude-sonnet-5.5).
+            // O modelo vem da entrada openrouter_model do workflow.
+            openrouter: {
+              label: 'OpenRouter',
+              envKey: 'OPENROUTER_API_KEY',
+              modelEnv: 'OPENROUTER_MODEL',
+              defaultModel: 'anthropic/claude-sonnet-5.5',
+              build: (model, key) => ({
+                url: 'https://openrouter.ai/api/v1/chat/completions',
                 headers: {
                   'content-type': 'application/json',
                   Authorization: `Bearer ${key}`,
