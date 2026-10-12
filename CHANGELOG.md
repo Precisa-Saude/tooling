@@ -1,3 +1,9 @@
+## [3.1.0](https://github.com/Precisa-Saude/tooling/compare/v3.0.1...v3.1.0) (2026-10-12)
+
+### Features
+
+* **ci:** OpenRouter como provedor da revisão automática ([#67](https://github.com/Precisa-Saude/tooling/issues/67)) ([5d0277c](https://github.com/Precisa-Saude/tooling/commit/5d0277c074ce9a65cb0a3c44b8d9ce58ee92efff))
+
 ## [3.0.1](https://github.com/Precisa-Saude/tooling/compare/v3.0.0...v3.0.1) (2026-10-10)
 
 ### Bug Fixes
