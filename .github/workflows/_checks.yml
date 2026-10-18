@@ -2,6 +2,16 @@ name: CI Checks
 
 # Checks comuns chamados por SHA nas entradas locais. Checks de domínio
 # permanecem no consumidor; os scripts do package.json definem a execução.
+#
+# Dois jobs, não seis. Cada job em runner hospedado paga checkout, setup e
+# `pnpm install` de novo, e o GitHub cobra por minuto arredondado para cima
+# por job: um check de título de 4 segundos custa 1 minuto. Em 17 dias de
+# outubro de 2026 o `decks`, repositório privado, gastou 211 minutos em 30
+# execuções deste workflow, quase tudo em instalação repetida e
+# arredondamento. Com lint, typecheck, formatação e título num job só, e
+# build e testes noutro, a instalação acontece duas vezes por execução em
+# vez de seis, e o relatório continua mostrando todas as falhas de uma vez,
+# porque os passos estáticos seguem com `always()` depois do primeiro.
 
 on:
   workflow_call:
@@ -19,76 +29,8 @@ permissions:
   contents: read
 
 jobs:
-  commitlint-title:
-    name: PR title (Conventional Commits)
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: ${{ inputs.node_version }}
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - name: Validate PR title
-        env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
-        run: echo "$PR_TITLE" | pnpm exec commitlint
-
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: ${{ inputs.node_version }}
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-
-  typecheck:
-    name: Typecheck
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: ${{ inputs.node_version }}
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-
-  format:
-    name: Format check
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: ${{ inputs.node_version }}
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm format:check
-
-  build:
-    name: Build
+  static:
+    name: Lint & Types
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -100,11 +42,30 @@ jobs:
         with:
           node-version: ${{ inputs.node_version }}
           cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
+      - name: Instalar dependências
+        id: install
+        run: pnpm install --frozen-lockfile
+      - name: Validate PR title
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: echo "$PR_TITLE" | pnpm exec commitlint
+      # Os passos seguintes usam `always()` para que uma falha não esconda as
+      # demais: o objetivo é ver tudo numa execução só, em vez de descobrir um
+      # problema por rodada de CI. Só não rodam se a instalação falhou, porque
+      # aí todos falhariam pelo mesmo motivo.
+      - name: Lint
+        if: always() && steps.install.outcome == 'success'
+        run: pnpm lint
+      - name: Typecheck
+        if: always() && steps.install.outcome == 'success'
+        run: pnpm typecheck
+      - name: Format check
+        if: always() && steps.install.outcome == 'success'
+        run: pnpm format:check
 
   test:
-    name: Test
+    name: Build & Test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
