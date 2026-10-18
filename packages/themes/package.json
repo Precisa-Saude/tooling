@@ -1,6 +1,6 @@
 {
   "name": "@precisa-saude/themes",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "Shared CSS design tokens (colors, grid, typography scaffolding, status semantics) for Precisa Saúde repositories.",
   "keywords": [
     "css",

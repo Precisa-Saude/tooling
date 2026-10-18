@@ -1,3 +1,9 @@
+## [3.2.0](https://github.com/Precisa-Saude/tooling/compare/v3.1.0...v3.2.0) (2026-10-18)
+
+### Features
+
+* **ci:** dois jobs em vez de seis no _checks.yml compartilhado ([#68](https://github.com/Precisa-Saude/tooling/issues/68)) ([807c552](https://github.com/Precisa-Saude/tooling/commit/807c5522b776f2955ecb8e8ae8849ca9fa5d48c5))
+
 ## [3.1.0](https://github.com/Precisa-Saude/tooling/compare/v3.0.1...v3.1.0) (2026-10-12)
 
 ### Features
