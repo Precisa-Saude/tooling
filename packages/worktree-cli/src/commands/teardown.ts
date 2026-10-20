@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- CLI de teardown: imprime progresso no console de propósito */
 import { execFileSync } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 
@@ -24,15 +25,7 @@ export async function teardown({
   const entry = await getBranchEntry(cfg, branch);
   const wtPath = worktreePath(cfg, repoRoot, branch);
 
-  if (entry) {
-    for (const svc of cfg.services) {
-      const port = portFor(entry, svc);
-      if (isPortInUse(port)) {
-        console.log(chalk.bold(`Stopping ${svc.name} dev server on port ${port}...`));
-        await killPort(port);
-      }
-    }
-  }
+  if (entry) await stopServices(cfg, entry);
 
   if (existsSync(wtPath)) {
     console.log(chalk.bold(`Removing worktree: ${wtPath}`));
@@ -60,14 +53,33 @@ export async function teardown({
     }
   }
 
+  await releaseBranchResources(cfg, branch);
+
+  console.log(chalk.green(`Teardown complete for '${branch}'.`));
+}
+
+/** Kill the dev servers listening on the ports allocated to a branch. */
+export async function stopServices(
+  cfg: WorktreeConfig,
+  entry: { ports: Record<string, number> },
+): Promise<void> {
+  for (const svc of cfg.services) {
+    const port = portFor(entry, svc);
+    if (isPortInUse(port)) {
+      console.log(chalk.bold(`Stopping ${svc.name} dev server on port ${port}...`));
+      await killPort(port);
+    }
+  }
+}
+
+/** Free the branch's registry slot and delete its log files. */
+export async function releaseBranchResources(cfg: WorktreeConfig, branch: string): Promise<void> {
   await free(cfg, branch);
 
   for (const svc of cfg.services) {
     const path = logFile(svc, branch);
     if (existsSync(path)) rmSync(path);
   }
-
-  console.log(chalk.green(`Teardown complete for '${branch}'.`));
 }
 
 function branchRefExists(repoRoot: string, branch: string): boolean {
