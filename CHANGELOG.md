@@ -1,3 +1,10 @@
+## [3.3.0](https://github.com/Precisa-Saude/tooling/compare/v3.2.1...v3.3.0) (2026-10-20)
+
+### Features
+
+* **agent-instructions:** limpar worktree e branch quando o PR aparece mesclado ([#70](https://github.com/Precisa-Saude/tooling/issues/70)) ([cd104d9](https://github.com/Precisa-Saude/tooling/commit/cd104d93b93d8099167f959d7983daf262d61f67))
+* **worktree-cli:** adiciona o comando prune para branches de PR mesclado ([#71](https://github.com/Precisa-Saude/tooling/issues/71)) ([8d079aa](https://github.com/Precisa-Saude/tooling/commit/8d079aaee80e75a752f8cedca338a9957250a9d0))
+
 ## [3.2.1](https://github.com/Precisa-Saude/tooling/compare/v3.2.0...v3.2.1) (2026-10-20)
 
 ### Bug Fixes
