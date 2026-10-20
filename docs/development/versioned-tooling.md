@@ -17,7 +17,10 @@ conteúdo por requisitos estruturais e distribui implementações por versões.
 
 Os inputs de workflows têm defaults compatíveis. Alterações incompatíveis nos
 inputs ou nas saídas exigem release maior. `_checks.yml` aceita `node_version`
-e `test_script`; `review.yml` aceita `exclude_paths`. Jobs específicos podem
+e `test_script`; `review.yml` aceita `exclude_paths`. Os dois aceitam
+`runs_on`, o rótulo do runner em JSON (`'"ubuntu-latest"'` por padrão): os
+repositórios privados passam o self-hosted, porque o GitHub não cobra minuto
+de runner próprio. Jobs específicos podem
 continuar em workflows locais. O caller concede as permissões necessárias e
 passa secrets apenas aos jobs que já dependiam deles.
 

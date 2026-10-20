@@ -57,13 +57,13 @@ diferenças de conteúdo. Lint, build e testes continuam nos jobs de CI.
 
 ## Workflows compartilhados
 
-| Workflow           | Responsabilidade e extensão local                                 |
-| ------------------ | ----------------------------------------------------------------- |
-| `_checks.yml`      | Checks comuns; inputs `node_version` e `test_script`              |
-| `_release.yml`     | Release, com `require_package_changes` controlado pelo consumidor |
-| `_publish.yml`     | Publicação do `release_sha` e lista explícita de pacotes          |
-| `_deploy-site.yml` | Projeto, filtro e diretórios de origem do site por inputs         |
-| `review.yml`       | Revisão com política explícita, `pr_number` e exclusões           |
+| Workflow           | Responsabilidade e extensão local                                  |
+| ------------------ | ------------------------------------------------------------------ |
+| `_checks.yml`      | Checks comuns; inputs `node_version`, `test_script` e `runs_on`    |
+| `_release.yml`     | Release, com `require_package_changes` controlado pelo consumidor  |
+| `_publish.yml`     | Publicação do `release_sha` e lista explícita de pacotes           |
+| `_deploy-site.yml` | Projeto, filtro e diretórios de origem do site por inputs          |
+| `review.yml`       | Revisão com política explícita, `pr_number`, exclusões e `runs_on` |
 
 `ci.yml` pertence a cada consumidor e define triggers, permissões, dependências
 entre jobs e checks específicos. Os inputs novos exigem uma release que já os

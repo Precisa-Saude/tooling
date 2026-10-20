@@ -78,3 +78,15 @@ it('o CI local não agenda revisão externa enquanto a política da base ainda p
     false,
   );
 });
+
+it('runs_on escolhe o runner dos jobs, com o hospedado como padrão', () => {
+  for (const file of ['_checks.yml', 'review.yml']) {
+    const parsed = parse(readFileSync(join(root, '.github/workflows', file), 'utf8'));
+    const input = parsed.on.workflow_call.inputs.runs_on;
+    assert.equal(input.type, 'string', file);
+    assert.equal(JSON.parse(input.default), 'ubuntu-latest', file);
+    for (const [name, job] of Object.entries(parsed.jobs)) {
+      assert.equal(job['runs-on'], '${{ fromJSON(inputs.runs_on) }}', `${file} ${name}`);
+    }
+  }
+});
