@@ -16,7 +16,7 @@ Shared tooling, configs, design tokens, and a bootstrap CLI for the [Precisa Sa√
 | [`@precisa-saude/themes`](./packages/themes)                         | Design tokens (colors, CSS variables).                                                                               |
 | [`@precisa-saude/tsconfig`](./packages/tsconfig)                     | `base.json`, `library.json`, `react.json`.                                                                           |
 | [`@precisa-saude/ui`](./packages/ui)                                 | Shared React components (Base UI under the hood).                                                                    |
-| [`@precisa-saude/worktree-cli`](./packages/worktree-cli)             | Git-worktree lifecycle CLI (`setup`/`dev`/`stop`/`teardown`/`list`/`logs`).                                          |
+| [`@precisa-saude/worktree-cli`](./packages/worktree-cli)             | Git-worktree lifecycle CLI (`setup`/`dev`/`stop`/`teardown`/`list`/`logs`/`prune`).                                  |
 
 ### File templates
 

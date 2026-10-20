@@ -77,6 +77,15 @@ export interface WorktreeConfig {
   portLockDir?: string;
   /** Absolute path to the port registry JSON file. */
   portRegistry: string;
+  /**
+   * Options for `precisa-worktree prune`. `protected` lists local branch
+   * names that prune never removes, whatever the state of their PR.
+   * A repo may declare only this field (no `services`) to use prune
+   * without the port-allocation features.
+   *
+   * Example: `prune: { protected: ['test/fixture-worktree'] }`
+   */
+  prune?: { protected?: string[] };
   /** Services managed by this repo. At least one required. */
   services: ServiceConfig[];
   /**
@@ -144,6 +153,49 @@ export async function loadConfig(repoRoot: string): Promise<WorktreeConfig> {
   }
 
   return cfg;
+}
+
+export interface PruneConfig {
+  /** Full worktree config, or null when the repo has no `worktree.services`. */
+  cfg: WorktreeConfig | null;
+  protectedBranches: string[];
+}
+
+/**
+ * Lenient loader for `prune`, which must work in any git repo: no
+ * `package.json`, or no `worktree` field, yields `{ cfg: null }`. A
+ * `worktree` field that declares `services` is validated like
+ * `loadConfig` does, so a broken config still surfaces as an error.
+ */
+export async function loadPruneConfig(repoRoot: string): Promise<PruneConfig> {
+  const pkgPath = resolve(repoRoot, 'package.json');
+  let text: string;
+  try {
+    text = await readFile(pkgPath, 'utf-8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { cfg: null, protectedBranches: [] };
+    }
+    throw err;
+  }
+
+  let pkg: PackageJson;
+  try {
+    pkg = JSON.parse(text) as PackageJson;
+  } catch (err) {
+    throw new Error(`Failed to parse ${pkgPath}: ${(err as Error).message}`);
+  }
+
+  const wt = pkg.worktree as Partial<WorktreeConfig> | undefined;
+  if (!wt) return { cfg: null, protectedBranches: [] };
+
+  const list: unknown = wt.prune?.protected ?? [];
+  if (!Array.isArray(list) || !list.every((b) => typeof b === 'string')) {
+    throw new Error('worktree.prune.protected must be an array of branch names');
+  }
+
+  const cfg = wt.services ? await loadConfig(repoRoot) : null;
+  return { cfg, protectedBranches: list };
 }
 
 export function lockDir(cfg: WorktreeConfig): string {

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable no-console -- ponto de entrada do CLI: erros vão para o console de propósito */
 import { rmdirSync } from 'node:fs';
 
 import chalk from 'chalk';
@@ -7,10 +8,11 @@ import { Command } from 'commander';
 import { dev } from './commands/dev.js';
 import { list } from './commands/list.js';
 import { logs } from './commands/logs.js';
+import { prune } from './commands/prune.js';
 import { setup } from './commands/setup.js';
 import { stop } from './commands/stop.js';
 import { teardown } from './commands/teardown.js';
-import { loadConfig, lockDir, type WorktreeConfig } from './config.js';
+import { loadConfig, loadPruneConfig, lockDir, type WorktreeConfig } from './config.js';
 import { detectBranch, findRepoRoot, mainWorktreeRoot } from './paths.js';
 
 async function main(): Promise<void> {
@@ -72,6 +74,27 @@ async function main(): Promise<void> {
       await logs({ branch, cfg, service: opts.service });
     });
 
+  program
+    .command('prune')
+    .description('Remove worktrees and local branches whose PR was merged (dry run unless --yes)')
+    .option('-y, --yes', 'Apply the removals; without it, only list them', false)
+    .option('--include-closed', 'Also remove branches whose PR was closed without merge', false)
+    .option('--remote', 'Also delete remote branches of merged PRs left on origin', false)
+    .action(async (opts: { includeClosed: boolean; remote: boolean; yes: boolean }) => {
+      const mainRoot = mainWorktreeRoot();
+      const { cfg, protectedBranches } = await loadPruneConfig(mainRoot);
+      if (cfg) releaseLockOnExit(cfg);
+      const result = await prune({
+        apply: opts.yes,
+        cfg,
+        includeClosed: opts.includeClosed,
+        mainRoot,
+        protectedBranches,
+        remote: opts.remote,
+      });
+      if (result.failed > 0) process.exitCode = 1;
+    });
+
   // Global EXIT handler — release the lock if we died mid-operation.
   // Safe because `rmdir` only succeeds on an empty directory we created.
   process.on('exit', () => {
@@ -110,14 +133,7 @@ async function resolveContext(opts: ResolveOpts): Promise<{
   const cfg = await loadConfig(mainRoot);
 
   // Install an exit handler now that we know the lock path.
-  const lockPath = lockDir(cfg);
-  process.on('exit', () => {
-    try {
-      rmdirSync(lockPath);
-    } catch {
-      // already released or never held
-    }
-  });
+  releaseLockOnExit(cfg);
 
   let branch = opts.branchArg ?? '';
   if (!branch && opts.allowDetect) {
@@ -134,6 +150,17 @@ async function resolveContext(opts: ResolveOpts): Promise<{
   }
 
   return { branch, cfg, mainRoot, wtRoot };
+}
+
+function releaseLockOnExit(cfg: WorktreeConfig): void {
+  const lockPath = lockDir(cfg);
+  process.on('exit', () => {
+    try {
+      rmdirSync(lockPath);
+    } catch {
+      // already released or never held
+    }
+  });
 }
 
 void main();
