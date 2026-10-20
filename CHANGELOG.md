@@ -1,3 +1,9 @@
+## [3.4.0](https://github.com/Precisa-Saude/tooling/compare/v3.3.0...v3.4.0) (2026-10-20)
+
+### Features
+
+* **ci:** runs_on escolhe o runner do _checks.yml e do review.yml ([#72](https://github.com/Precisa-Saude/tooling/issues/72)) ([630db39](https://github.com/Precisa-Saude/tooling/commit/630db39bc52cacb1e306508ffb097f6906cdbb74))
+
 ## [3.3.0](https://github.com/Precisa-Saude/tooling/compare/v3.2.1...v3.3.0) (2026-10-20)
 
 ### Features
