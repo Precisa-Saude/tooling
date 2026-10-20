@@ -616,6 +616,22 @@ This stops the dev servers, removes the worktree, deletes the local
 branch, frees the ports in the registry, and clears logs. Don't do any
 of this manually. Pass `--keep-branch` to preserve the local branch.
 
+**The merge is usually not yours.** PRs are often merged on GitHub
+between sessions, so no agent sees the merge happen and the rule above
+never fires. Orphan worktrees and local branches pile up this way (45 in
+platform, 58 in lattes-editor). Close that gap without being asked:
+
+- Whenever a PR you are following shows as merged or closed, tear down
+  its worktree and local branch right then.
+- Before starting new work in a repo, sweep with the repo's batch
+  script, dry run first (`scripts/prune-merged-branches.sh` in
+  platform, `scripts/limpar-branches-mesclados.sh` in lattes-editor),
+  then apply.
+- Never remove a worktree with uncommitted changes, a branch with an
+  open PR, or a branch with no PR (list it for the user instead).
+- If the command is denied, give the user the exact command to run
+  rather than skipping the cleanup.
+
 ## Plan persistence
 
 Implementation plans created during conversations should be persisted
