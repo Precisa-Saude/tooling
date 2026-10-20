@@ -339,3 +339,78 @@ it('OpenRouter recebe a chave própria e o modelo da entrada, e só ele é chama
   assert.match(env.OPENROUTER_MODEL, /inputs\.openrouter_model/);
   assert.ok(review.on.workflow_call.secrets.OPENROUTER_API_KEY);
 });
+async function runReviewCall(env, respond) {
+  const step = review.jobs.review.steps.find((step) => step.id === 'call');
+  const script = step.run.replace(/^node << 'SCRIPT'\n/, '').replace(/\nSCRIPT\n?$/, '');
+  const calls = [];
+  const outputs = [];
+  const written = [];
+  await vm.runInNewContext(script, {
+    require: (name) =>
+      name === 'node:path'
+        ? { join }
+        : {
+            readFileSync: () => 'allowed diff',
+            appendFileSync: (_path, value) => outputs.push(value),
+            writeFileSync: (_path, value) => written.push(value),
+          },
+    process: {
+      env: { REVIEW_INPUT_DIR: work, GITHUB_OUTPUT: 'outputs', REVIEW_ROUND: '1', ...env },
+    },
+    console: { log: () => {} },
+    fetch: async (url, init) => {
+      calls.push({ url, maxTokens: JSON.parse(init.body).max_tokens });
+      return { ok: true, status: 200, text: async () => JSON.stringify(respond(url)) };
+    },
+  });
+  return { calls, outputs: outputs.join(''), written };
+}
+it('resposta truncada no limite de tokens passa para o próximo provedor autorizado', async () => {
+  const valid = '{"summary":"ok","changes":[],"feedback":[]}';
+  const { calls, outputs, written } = await runReviewCall(
+    {
+      REVIEW_PROVIDERS: '["openrouter","anthropic"]',
+      OPENROUTER_API_KEY: 'or-key',
+      ANTHROPIC_API_KEY: 'test-key',
+    },
+    (url) =>
+      url.includes('openrouter')
+        ? { choices: [{ finish_reason: 'length', message: { content: '' } }] }
+        : { content: [{ type: 'text', text: valid }], stop_reason: 'end_turn' },
+  );
+  assert.deepEqual(calls, [
+    { url: 'https://openrouter.ai/api/v1/chat/completions', maxTokens: 32000 },
+    { url: 'https://api.anthropic.com/v1/messages', maxTokens: 32000 },
+  ]);
+  assert.match(outputs, /status<<EOF\nok\n/);
+  assert.match(outputs, /fell_back<<EOF\ntrue\n/);
+  assert.deepEqual(written, [valid]);
+});
+it('resposta vazia ou fora do JSON vira erro com motivo, sem revisão em branco', async () => {
+  const { calls, outputs, written } = await runReviewCall(
+    {
+      REVIEW_PROVIDERS: '["openai","github-models","anthropic"]',
+      OPENAI_API_KEY: 'test-key',
+      GITHUB_TOKEN: 'test-key',
+      ANTHROPIC_API_KEY: 'test-key',
+    },
+    (url) => {
+      if (url.includes('openai.com')) {
+        return { choices: [{ finish_reason: 'stop', message: { content: '   ' } }] };
+      }
+      if (url.includes('github.ai')) {
+        return { choices: [{ finish_reason: 'stop', message: { content: 'não é JSON' } }] };
+      }
+      return { content: [{ type: 'text', text: '{"summary":' }], stop_reason: 'max_tokens' };
+    },
+  );
+  assert.deepEqual(
+    calls.map((call) => call.maxTokens),
+    [16384, 16384, 32000],
+  );
+  assert.equal(written.length, 0);
+  assert.match(outputs, /status<<EOF\nerror\n/);
+  assert.match(outputs, /OpenAI: resposta vazia/);
+  assert.match(outputs, /GitHub Models: resposta não é um JSON de revisão válido/);
+  assert.match(outputs, /Anthropic: resposta truncada no limite de tokens/);
+});
