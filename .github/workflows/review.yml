@@ -301,6 +301,29 @@ jobs:
             return (promptTokens / 1_000_000) * rate.in + (completionTokens / 1_000_000) * rate.out;
           }
 
+          // Limite de saída por provedor. 8192 era pouco: o Sonnet 5.5 via
+          // OpenRouter gastou o limite inteiro (73.489 in / 8.192 out) e devolveu
+          // conteúdo vazio, que virou um comentário em branco no PR. Claude
+          // Haiku/Sonnet aceitam 32000; gpt-4o-mini aceita no máximo 16384.
+          const MAX_TOKENS = {
+            anthropic: 32000,
+            openai: 16384,
+            'github-models': 16384,
+            openrouter: 32000,
+          };
+
+          // Respostas da API compatível com a OpenAI (OpenAI, GitHub Models,
+          // OpenRouter). finish_reason "length" indica corte no limite de tokens.
+          const openAiCompatible = {
+            extractText: (r) => r?.choices?.[0]?.message?.content ?? '',
+            extractTruncated: (r) => r?.choices?.[0]?.finish_reason === 'length',
+            extractUsage: (r) => ({
+              prompt_tokens: r?.usage?.prompt_tokens ?? 0,
+              completion_tokens: r?.usage?.completion_tokens ?? 0,
+            }),
+            extractError: (r) => r?.error?.message ?? 'see workflow logs',
+          };
+
           const providers = {
             anthropic: {
               label: 'Anthropic',
@@ -316,12 +339,17 @@ jobs:
                 },
                 body: JSON.stringify({
                   model,
-                  max_tokens: 8192,
+                  max_tokens: MAX_TOKENS.anthropic,
                   system,
                   messages: [{ role: 'user', content: user }],
                 }),
               }),
-              extractText: (r) => r?.content?.[0]?.text ?? '',
+              // Junta só os blocos de texto; outros tipos de bloco não são revisão.
+              extractText: (r) => (Array.isArray(r?.content) ? r.content : [])
+                .filter((block) => block?.type === 'text')
+                .map((block) => block.text ?? '')
+                .join(''),
+              extractTruncated: (r) => r?.stop_reason === 'max_tokens',
               extractUsage: (r) => ({
                 prompt_tokens: r?.usage?.input_tokens ?? 0,
                 completion_tokens: r?.usage?.output_tokens ?? 0,
@@ -341,7 +369,7 @@ jobs:
                 },
                 body: JSON.stringify({
                   model,
-                  max_tokens: 8192,
+                  max_tokens: MAX_TOKENS.openai,
                   messages: [
                     { role: 'system', content: system },
                     { role: 'user', content: user },
@@ -349,12 +377,7 @@ jobs:
                   response_format: { type: 'json_object' },
                 }),
               }),
-              extractText: (r) => r?.choices?.[0]?.message?.content ?? '',
-              extractUsage: (r) => ({
-                prompt_tokens: r?.usage?.prompt_tokens ?? 0,
-                completion_tokens: r?.usage?.completion_tokens ?? 0,
-              }),
-              extractError: (r) => r?.error?.message ?? 'see workflow logs',
+              ...openAiCompatible,
             },
             // GitHub Models — OpenAI-compatible API authenticated via the
             // built-in GITHUB_TOKEN + `models: read` permission. No
@@ -375,7 +398,7 @@ jobs:
                 },
                 body: JSON.stringify({
                   model,
-                  max_tokens: 8192,
+                  max_tokens: MAX_TOKENS['github-models'],
                   messages: [
                     { role: 'system', content: system },
                     { role: 'user', content: user },
@@ -383,12 +406,7 @@ jobs:
                   response_format: { type: 'json_object' },
                 }),
               }),
-              extractText: (r) => r?.choices?.[0]?.message?.content ?? '',
-              extractUsage: (r) => ({
-                prompt_tokens: r?.usage?.prompt_tokens ?? 0,
-                completion_tokens: r?.usage?.completion_tokens ?? 0,
-              }),
-              extractError: (r) => r?.error?.message ?? 'see workflow logs',
+              ...openAiCompatible,
             },
             // OpenRouter: API compatível com a da OpenAI, com modelos de vários
             // provedores pelo id do catálogo (anthropic/claude-sonnet-5.5).
@@ -406,7 +424,7 @@ jobs:
                 },
                 body: JSON.stringify({
                   model,
-                  max_tokens: 8192,
+                  max_tokens: MAX_TOKENS.openrouter,
                   messages: [
                     { role: 'system', content: system },
                     { role: 'user', content: user },
@@ -414,12 +432,7 @@ jobs:
                   response_format: { type: 'json_object' },
                 }),
               }),
-              extractText: (r) => r?.choices?.[0]?.message?.content ?? '',
-              extractUsage: (r) => ({
-                prompt_tokens: r?.usage?.prompt_tokens ?? 0,
-                completion_tokens: r?.usage?.completion_tokens ?? 0,
-              }),
-              extractError: (r) => r?.error?.message ?? 'see workflow logs',
+              ...openAiCompatible,
             },
           };
 
@@ -429,6 +442,18 @@ jobs:
           const setOutput = (k, v) => {
             fs.appendFileSync(process.env.GITHUB_OUTPUT, `${k}<<EOF\n${String(v)}\nEOF\n`);
           };
+
+          // Mesma limpeza de cerca markdown que o passo "Post review" aplica.
+          function parseReview(text) {
+            let s = text.trim();
+            if (s.startsWith('```')) s = s.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+            try {
+              const review = JSON.parse(s);
+              return review && typeof review === 'object' && !Array.isArray(review) ? review : null;
+            } catch {
+              return null;
+            }
+          }
 
           async function tryProvider(name) {
             const p = providers[name];
@@ -461,6 +486,19 @@ jobs:
               }
               const reviewText = p.extractText(parsed);
               const usage = p.extractUsage(parsed);
+              // HTTP 200 não garante revisão utilizável. Resposta cortada no
+              // limite, vazia ou fora do formato JSON conta como falha, para
+              // que o próximo provedor autorizado seja tentado em vez de
+              // publicar um comentário em branco.
+              if (p.extractTruncated(parsed)) {
+                return { ok: false, reason: 'resposta truncada no limite de tokens', provider: name, model };
+              }
+              if (!reviewText.trim()) {
+                return { ok: false, reason: 'resposta vazia', provider: name, model };
+              }
+              if (!parseReview(reviewText)) {
+                return { ok: false, reason: 'resposta não é um JSON de revisão válido', provider: name, model };
+              }
               return { ok: true, provider: name, model, reviewText, usage };
             } catch (e) {
               return { ok: false, reason: 'network error', provider: name, model };
@@ -584,11 +622,14 @@ jobs:
               if (s.startsWith('```')) s = s.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
               review = JSON.parse(s);
             } catch (e) {
+              // O passo anterior já rejeita resposta vazia ou fora do JSON; esta
+              // proteção evita publicar corpo em branco se algo escapar.
+              const content = raw || '_O provedor devolveu uma resposta vazia; nenhuma revisão foi gerada._';
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
-                body: `## Automated Review (Round ${round})\n\n${raw}\n\n---\n*Reviewed by ${providerLabel} ${providerModel}${fallbackBadge}${usagePart}*`,
+                body: `## Automated Review (Round ${round})\n\n${content}\n\n---\n*Reviewed by ${providerLabel} ${providerModel}${fallbackBadge}${usagePart}*`,
               });
               return;
             }
