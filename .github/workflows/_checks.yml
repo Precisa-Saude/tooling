@@ -20,6 +20,13 @@ on:
         description: 'Versão do Node adotada pelo repositório'
         type: string
         default: '22'
+      runs_on:
+        description: >-
+          Rótulo do runner em JSON, como o `runs-on` aceita: '"ubuntu-latest"'
+          ou '["self-hosted","linux","x64"]'. Repositório privado passa o
+          self-hosted para não gastar minuto hospedado.
+        type: string
+        default: '"ubuntu-latest"'
       test_script:
         description: 'Script adicional a test; use test:coverage para cobertura'
         type: string
@@ -31,7 +38,7 @@ permissions:
 jobs:
   static:
     name: Lint & Types
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runs_on) }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -66,7 +73,7 @@ jobs:
 
   test:
     name: Build & Test
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runs_on) }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
