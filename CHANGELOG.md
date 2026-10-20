@@ -1,3 +1,9 @@
+## [3.2.1](https://github.com/Precisa-Saude/tooling/compare/v3.2.0...v3.2.1) (2026-10-20)
+
+### Bug Fixes
+
+* **ci:** tratar resposta truncada ou vazia como falha na revisão automática ([#69](https://github.com/Precisa-Saude/tooling/issues/69)) ([d498d3a](https://github.com/Precisa-Saude/tooling/commit/d498d3a702dfb7b1e1b9bca3e022624710fe14f4)), closes [#102](https://github.com/Precisa-Saude/tooling/issues/102)
+
 ## [3.2.0](https://github.com/Precisa-Saude/tooling/compare/v3.1.0...v3.2.0) (2026-10-18)
 
 ### Features
