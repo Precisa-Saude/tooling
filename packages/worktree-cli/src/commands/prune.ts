@@ -20,6 +20,8 @@ export interface PullRequest {
 export interface RepoPullRequests {
   /** The repo's default branch on GitHub, never touched (besides `main`). */
   defaultBranch?: string;
+  /** `owner/repo` on GitHub, for deleting remote branches through the API. */
+  nameWithOwner?: string;
   pullRequests: PullRequest[];
 }
 
@@ -36,6 +38,11 @@ export interface PruneOptions {
   cfg?: WorktreeConfig | null;
   /** Root of the worktree the command runs from. Defaults to `git rev-parse --show-toplevel`. */
   cwdWorktree?: string;
+  /**
+   * Deletes one remote branch. Defaults to the GitHub API
+   * (deleteRemoteBranchViaApi); tests swap in a local `origin`.
+   */
+  deleteRemoteBranch?: (branch: string) => void;
   err?: (line: string) => void;
   /** Also remove branches whose PR was closed without merge. */
   includeClosed?: boolean;
@@ -178,7 +185,24 @@ export function fetchPullRequests(mainRoot: string, err: (line: string) => void)
     );
   }
   const defaultBranch = repo.defaultBranchRef?.name;
-  return defaultBranch ? { defaultBranch, pullRequests } : { pullRequests };
+  return {
+    ...(defaultBranch ? { defaultBranch } : {}),
+    nameWithOwner: repo.nameWithOwner,
+    pullRequests,
+  };
+}
+
+/**
+ * Deletes a remote branch through the GitHub API. `git push origin --delete`
+ * runs the consumer's pre-push hook once per branch (in platform, install,
+ * lint, typecheck and the test suite), with no code being pushed.
+ */
+export function deleteRemoteBranchViaApi(
+  nameWithOwner: string,
+  branch: string,
+  exec: (cmd: string, args: string[]) => string = run,
+): void {
+  exec('gh', ['api', '-X', 'DELETE', `repos/${nameWithOwner}/git/refs/heads/${branch}`]);
 }
 
 export async function prune(opts: PruneOptions): Promise<PruneResult> {
@@ -270,7 +294,13 @@ export async function prune(opts: PruneOptions): Promise<PruneResult> {
     result.removed++;
   }
 
-  if (opts.remote) pruneRemote({ apply, git, includeClosed, neverTouch, out, prByHead, result });
+  if (opts.remote) {
+    const nameWithOwner = repoPrs.nameWithOwner;
+    const deleteBranch =
+      opts.deleteRemoteBranch ??
+      (nameWithOwner ? (b: string) => deleteRemoteBranchViaApi(nameWithOwner, b) : undefined);
+    pruneRemote({ apply, deleteBranch, git, includeClosed, neverTouch, out, prByHead, result });
+  }
 
   out('');
   if (apply) {
@@ -284,6 +314,8 @@ export async function prune(opts: PruneOptions): Promise<PruneResult> {
 
 interface RemoteContext {
   apply: boolean;
+  /** Undefined when the GitHub repo is unknown: nothing remote is deleted. */
+  deleteBranch?: (branch: string) => void;
   git: (args: string[]) => string;
   includeClosed: boolean;
   neverTouch: Map<string, string>;
@@ -332,10 +364,15 @@ function pruneRemote(ctx: RemoteContext): void {
       result.removed++;
       continue;
     }
+    if (!ctx.deleteBranch) {
+      out(`${pad('FAILED')}${label}: the GitHub repo is unknown, so the branch was not deleted`);
+      result.failed++;
+      continue;
+    }
     try {
-      git(['push', 'origin', '--delete', branch]);
+      ctx.deleteBranch(branch);
     } catch (e) {
-      out(`${pad('FAILED')}${label}: git push origin --delete failed (${firstLine(e)})`);
+      out(`${pad('FAILED')}${label}: deleting through the GitHub API failed (${firstLine(e)})`);
       result.failed++;
       continue;
     }

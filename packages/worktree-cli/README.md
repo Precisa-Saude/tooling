@@ -163,8 +163,11 @@ se alguma remoção falhou.
 
 Com `--remote`, as branches em `origin` cujo PR está `MERGED` (ou `CLOSED`,
 com `--include-closed`) e cuja ponta remota ainda é o `headRefOid` também são
-listadas, e `--yes` as apaga com `git push origin --delete`. Isso cobre o que o
-GitHub não apagou no merge.
+listadas, e `--yes` as apaga pela API do GitHub
+(`gh api -X DELETE repos/<dono>/<repo>/git/refs/heads/<branch>`). Isso cobre o
+que o GitHub não apagou no merge. A API, e não `git push origin --delete`,
+porque o push roda o pre-push do repositório a cada branch apagada (no
+platform, instalação, lint, typecheck e testes), sem enviar código nenhum.
 
 Para proteger branches, declare `prune.protected` no campo `worktree`. Um
 repositório sem serviços pode declarar só isso:
