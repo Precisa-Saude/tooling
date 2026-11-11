@@ -32,6 +32,13 @@ export interface ServiceConfig {
   pnpmFilter: string;
 }
 
+export interface PruneSettings {
+  archiveDir?: string;
+  keepPrefixes?: string[];
+  protected?: string[];
+  staleDays?: number;
+}
+
 export interface WorktreeConfig {
   /**
    * Optional extra build command run during `setup`, after `pnpm install`.
@@ -80,12 +87,16 @@ export interface WorktreeConfig {
   /**
    * Options for `precisa-worktree prune`. `protected` lists local branch
    * names that prune never removes, whatever the state of their PR.
-   * A repo may declare only this field (no `services`) to use prune
-   * without the port-allocation features.
+   * `staleDays` (default 7) is how long an unfinished branch may sit idle
+   * before prune archives and removes it. `keepPrefixes` (default
+   * `['park/']`) parks branches without a PR. `archiveDir` (default
+   * `~/.local/share/precisa-worktree/archive/<repo dir>`) receives the
+   * patches of uncommitted work. A repo may declare only this field (no
+   * `services`) to use prune without the port-allocation features.
    *
-   * Example: `prune: { protected: ['test/fixture-worktree'] }`
+   * Example: `prune: { protected: ['test/fixture-worktree'], staleDays: 14 }`
    */
-  prune?: { protected?: string[] };
+  prune?: PruneSettings;
   /** Services managed by this repo. At least one required. */
   services: ServiceConfig[];
   /**
@@ -156,9 +167,15 @@ export async function loadConfig(repoRoot: string): Promise<WorktreeConfig> {
 }
 
 export interface PruneConfig {
+  /** `worktree.prune.archiveDir`, when set. */
+  archiveDir?: string;
   /** Full worktree config, or null when the repo has no `worktree.services`. */
   cfg: WorktreeConfig | null;
+  /** `worktree.prune.keepPrefixes`, when set. */
+  keepPrefixes?: string[];
   protectedBranches: string[];
+  /** `worktree.prune.staleDays`, when set. */
+  staleDays?: number;
 }
 
 /**
@@ -189,13 +206,38 @@ export async function loadPruneConfig(repoRoot: string): Promise<PruneConfig> {
   const wt = pkg.worktree as Partial<WorktreeConfig> | undefined;
   if (!wt) return { cfg: null, protectedBranches: [] };
 
-  const list: unknown = wt.prune?.protected ?? [];
-  if (!Array.isArray(list) || !list.every((b) => typeof b === 'string')) {
+  const settings: Record<string, unknown> = { ...wt.prune };
+  const list = settings.protected ?? [];
+  if (!isStringArray(list)) {
     throw new Error('worktree.prune.protected must be an array of branch names');
+  }
+  const { archiveDir, keepPrefixes, staleDays } = settings;
+  if (keepPrefixes !== undefined && !isStringArray(keepPrefixes)) {
+    throw new Error('worktree.prune.keepPrefixes must be an array of branch-name prefixes');
+  }
+  if (staleDays !== undefined && !isDayCount(staleDays)) {
+    throw new Error('worktree.prune.staleDays must be a non-negative number of days');
+  }
+  if (archiveDir !== undefined && (typeof archiveDir !== 'string' || archiveDir === '')) {
+    throw new Error('worktree.prune.archiveDir must be a path');
   }
 
   const cfg = wt.services ? await loadConfig(repoRoot) : null;
-  return { cfg, protectedBranches: list };
+  return {
+    cfg,
+    protectedBranches: list,
+    ...(archiveDir !== undefined ? { archiveDir } : {}),
+    ...(keepPrefixes !== undefined ? { keepPrefixes } : {}),
+    ...(staleDays !== undefined ? { staleDays } : {}),
+  };
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((v) => typeof v === 'string');
+}
+
+export function isDayCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
 export function lockDir(cfg: WorktreeConfig): string {
