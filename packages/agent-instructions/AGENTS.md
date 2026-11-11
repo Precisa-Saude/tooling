@@ -627,8 +627,12 @@ platform, 58 in lattes-editor). Close that gap without being asked:
   script, dry run first (`scripts/prune-merged-branches.sh` in
   platform, `scripts/limpar-branches-mesclados.sh` in lattes-editor),
   then apply.
-- Never remove a worktree with uncommitted changes, a branch with an
-  open PR, or a branch with no PR (list it for the user instead).
+- `precisa-worktree prune` archives and removes anything idle longer
+  than `staleDays` (7 by default), except open PRs, the current
+  worktree and `park/*` branches. Archiving means a tag
+  `archive/<date>/<branch>` at the tip plus a patch of uncommitted work
+  under `~/.local/share/precisa-worktree/archive/`, so nothing is lost.
+  To keep a branch without a PR, name it `park/...`.
 - If the command is denied, give the user the exact command to run
   rather than skipping the cleanup.
 
