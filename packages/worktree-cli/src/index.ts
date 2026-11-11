@@ -9,6 +9,7 @@ export type {
 } from './commands/prune.js';
 export {
   classifyBranch,
+  deleteRemoteBranchViaApi,
   latestPullRequests,
   parseWorktreeList,
   PR_LIST_LIMIT,
