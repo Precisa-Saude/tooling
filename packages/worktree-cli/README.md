@@ -217,11 +217,14 @@ como `would free`, e `--yes` encerra os servidores que ainda escutam naquelas
 portas, libera a posição e apaga os logs.
 
 Com `--remote`, as branches em `origin` cujo PR está `MERGED` (ou `CLOSED`,
-com `--include-closed`) também são listadas. Se a ponta remota é o
-`headRefOid`, `--yes` apaga a branch com `git push origin --delete`. Se não é,
-a branch espera o commit da ponta ficar mais velho que `staleDays`; então o
-comando busca esse commit, cria a tag `archive/<AAAA-MM-DD>/origin__<branch>`
-nele e só depois apaga a branch remota.
+com `--include-closed`) também são listadas. `--yes` as apaga pela API do
+GitHub (`gh api -X DELETE repos/<dono>/<repo>/git/refs/heads/<branch>`), e não
+com `git push origin --delete`, porque o push roda o pre-push do repositório a
+cada branch apagada (no platform, instalação, lint, typecheck e testes), sem
+enviar código nenhum. Se a ponta remota é o `headRefOid`, a branch é apagada na
+hora. Se não é, ela espera o commit da ponta ficar mais velho que `staleDays`;
+então o comando busca esse commit, cria a tag
+`archive/<AAAA-MM-DD>/origin__<branch>` nele e só depois apaga a branch remota.
 
 ### Configuração
 

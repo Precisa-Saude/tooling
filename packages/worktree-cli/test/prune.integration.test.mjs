@@ -266,7 +266,16 @@ describe('prune --remote', () => {
       // Local copies go away so only the remote pass is exercised.
       git(root, 'branch', '-D', 'feat/r-merged', 'feat/r-moved', 'feat/r-open', 'feat/r-closed');
 
-      const opts = { pullRequests: { defaultBranch: 'main', pullRequests: prs }, remote: true };
+      // The API call is swapped for a delete on the local origin.
+      const deleted = [];
+      const opts = {
+        deleteRemoteBranch: (b) => {
+          deleted.push(b);
+          git(root, 'push', '-q', 'origin', '--delete', b);
+        },
+        pullRequests: { defaultBranch: 'main', pullRequests: prs },
+        remote: true,
+      };
       const dry = await run(repo, opts);
       assert.match(lineFor(dry.text, 'would remove', 'origin/feat/r-merged'), /tip [0-9a-f]{7}/);
       assert.match(
@@ -288,6 +297,27 @@ describe('prune --remote', () => {
 
       await run(repo, { ...opts, apply: true, includeClosed: true });
       assert.deepEqual(remoteBranches(origin), ['feat/r-moved', 'feat/r-open', 'main']);
+      assert.deepEqual(deleted, ['feat/r-merged', 'feat/r-closed']);
+    } finally {
+      rmSync(repo.base, { force: true, recursive: true });
+    }
+  });
+
+  it('without the GitHub repo, nothing remote is deleted and the line says why', async () => {
+    const repo = makeRepo();
+    try {
+      const { root, origin } = repo;
+      const tip = branch(root, 'feat/r-orphan');
+      git(root, 'push', '-q', 'origin', 'feat/r-orphan');
+      git(root, 'branch', '-D', 'feat/r-orphan');
+      const { result, text } = await run(repo, {
+        apply: true,
+        pullRequests: { defaultBranch: 'main', pullRequests: [pr('feat/r-orphan', tip)] },
+        remote: true,
+      });
+      assert.equal(result.failed, 1);
+      assert.match(text, /GitHub repo is unknown/);
+      assert.ok(remoteBranches(origin).includes('feat/r-orphan'));
     } finally {
       rmSync(repo.base, { force: true, recursive: true });
     }
@@ -565,7 +595,15 @@ describe('prune --remote (stale)', () => {
       git(other, 'push', '-q', 'origin', 'feat/r-moved');
       const remoteTip = git(other, 'rev-parse', 'HEAD');
 
+      // A exclusão pela API vira uma exclusão no origin local, e a ordem
+      // confere que a tag de arquivo existe antes de a branch sumir.
+      const deleted = [];
       const opts = {
+        deleteRemoteBranch: (b) => {
+          assert.match(git(root, 'tag', '--list', `archive/*/origin__${b}`), /origin__/);
+          deleted.push(b);
+          git(root, 'push', '-q', 'origin', '--delete', b);
+        },
         now: LATER,
         pullRequests: { pullRequests: [pr('feat/r-moved', headTip)] },
         remote: true,
@@ -590,6 +628,7 @@ describe('prune --remote (stale)', () => {
         new RegExp(`archived as archive/${date}/origin__feat/r-moved`),
       );
       assert.deepEqual(remoteBranches(origin), ['main']);
+      assert.deepEqual(deleted, ['feat/r-moved']);
       assert.equal(
         git(root, 'rev-parse', `archive/${date}/origin__feat/r-moved^{commit}`),
         remoteTip,

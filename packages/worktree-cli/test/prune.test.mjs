@@ -13,6 +13,7 @@ import {
   classifyBranch,
   DEFAULT_STALE_DAYS,
   idleDays,
+  deleteRemoteBranchViaApi,
   latestPullRequests,
   loadPruneConfig,
   parseStatusPaths,
@@ -336,4 +337,17 @@ describe('loadPruneConfig', () => {
     withPkg('{', async (dir) => {
       await assert.rejects(loadPruneConfig(dir), /Failed to parse/);
     }));
+});
+
+describe('deleteRemoteBranchViaApi', () => {
+  it('deletes the ref through gh api, not git push (no pre-push hook)', () => {
+    const calls = [];
+    deleteRemoteBranchViaApi('Org/repo', 'feat/x', (cmd, args) => {
+      calls.push([cmd, ...args]);
+      return '';
+    });
+    assert.deepEqual(calls, [
+      ['gh', 'api', '-X', 'DELETE', 'repos/Org/repo/git/refs/heads/feat/x'],
+    ]);
+  });
 });

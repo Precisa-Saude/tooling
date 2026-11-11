@@ -99,3 +99,16 @@ export function lookupPullRequests(
     ),
   ) as PullRequest[];
 }
+
+/**
+ * Deletes a remote branch through the GitHub API. `git push origin --delete`
+ * runs the consumer's pre-push hook once per branch (in platform, install,
+ * lint, typecheck and the test suite), with no code being pushed.
+ */
+export function deleteRemoteBranchViaApi(
+  nameWithOwner: string,
+  branch: string,
+  exec: (cmd: string, args: string[]) => string = run,
+): void {
+  exec('gh', ['api', '-X', 'DELETE', `repos/${nameWithOwner}/git/refs/heads/${branch}`]);
+}

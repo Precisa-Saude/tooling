@@ -1,3 +1,9 @@
+## [3.4.1](https://github.com/Precisa-Saude/tooling/compare/v3.4.0...v3.4.1) (2026-11-11)
+
+### Bug Fixes
+
+* **worktree-cli:** prune --remote apaga a branch remota pela API do GitHub ([#73](https://github.com/Precisa-Saude/tooling/issues/73)) ([9dd24f2](https://github.com/Precisa-Saude/tooling/commit/9dd24f2f38f34f9895b0527bafe42684fbc678e0))
+
 ## [3.4.0](https://github.com/Precisa-Saude/tooling/compare/v3.3.0...v3.4.0) (2026-10-20)
 
 ### Features

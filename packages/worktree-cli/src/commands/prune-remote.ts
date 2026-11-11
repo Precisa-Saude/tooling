@@ -10,6 +10,8 @@ export interface RemoteContext {
   apply: boolean;
   /** `YYYY-MM-DD` for archive tags. */
   date: string;
+  /** Deletes one remote branch; undefined when the GitHub repo is unknown, so nothing remote is deleted. */
+  deleteBranch?: (branch: string) => void;
   git: (args: string[]) => string;
   includeClosed: boolean;
   neverTouch: Map<string, string>;
@@ -83,6 +85,11 @@ export function pruneRemote(ctx: RemoteContext): void {
       result.removed++;
       continue;
     }
+    if (!ctx.deleteBranch) {
+      out(`${pad('FAILED')}${label}: the GitHub repo is unknown, so the branch was not deleted`);
+      result.failed++;
+      continue;
+    }
     if (tag) {
       try {
         tagArchive(
@@ -98,9 +105,9 @@ export function pruneRemote(ctx: RemoteContext): void {
       }
     }
     try {
-      git(['push', 'origin', '--delete', branch]);
+      ctx.deleteBranch(branch);
     } catch (e) {
-      out(`${pad('FAILED')}${label}: git push origin --delete failed (${firstLine(e)})`);
+      out(`${pad('FAILED')}${label}: deleting through the GitHub API failed (${firstLine(e)})`);
       result.failed++;
       continue;
     }

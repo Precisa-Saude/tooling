@@ -4,6 +4,7 @@ import { type WorktreeConfig } from '../config.js';
 import { findRepoRoot } from '../paths.js';
 import { getBranchEntry, readRegistry } from '../registry.js';
 import {
+  deleteRemoteBranchViaApi,
   fetchPullRequests,
   latestPullRequests,
   lookupPullRequests,
@@ -27,6 +28,7 @@ import { releaseBranchResources, stopServices } from './teardown.js';
 
 export type { PullRequest, RepoPullRequests } from './prune-github.js';
 export {
+  deleteRemoteBranchViaApi,
   fetchPullRequests,
   latestPullRequests,
   lookupPullRequests,
@@ -56,6 +58,11 @@ export interface PruneOptions {
   cfg?: WorktreeConfig | null;
   /** Root of the worktree the command runs from. Defaults to `git rev-parse --show-toplevel`. */
   cwdWorktree?: string;
+  /**
+   * Deletes one remote branch. Defaults to the GitHub API
+   * (deleteRemoteBranchViaApi); tests swap in a local `origin`.
+   */
+  deleteRemoteBranch?: (branch: string) => void;
   err?: (line: string) => void;
   /** Also remove branches whose PR was closed without merge. */
   includeClosed?: boolean;
@@ -361,9 +368,13 @@ export async function prune(opts: PruneOptions): Promise<PruneResult> {
   }
 
   if (opts.remote) {
+    const deleteBranch =
+      opts.deleteRemoteBranch ??
+      (nameWithOwner ? (b: string) => deleteRemoteBranchViaApi(nameWithOwner, b) : undefined);
     pruneRemote({
       apply,
       date,
+      ...(deleteBranch ? { deleteBranch } : {}),
       git,
       includeClosed,
       neverTouch,

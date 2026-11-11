@@ -11,6 +11,7 @@ export {
   classifyBranch,
   DEFAULT_KEEP_PREFIXES,
   DEFAULT_STALE_DAYS,
+  deleteRemoteBranchViaApi,
   latestPullRequests,
   parseWorktreeList,
   PR_LIST_LIMIT,
