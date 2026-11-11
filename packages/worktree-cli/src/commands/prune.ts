@@ -1,37 +1,57 @@
-import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
 import { type WorktreeConfig } from '../config.js';
 import { findRepoRoot } from '../paths.js';
-import { getBranchEntry } from '../registry.js';
+import { getBranchEntry, readRegistry } from '../registry.js';
+import {
+  fetchPullRequests,
+  latestPullRequests,
+  lookupPullRequests,
+  type PullRequest,
+  type RepoPullRequests,
+} from './prune-github.js';
+import { firstLine, pad, pruneRemote } from './prune-remote.js';
+import {
+  archiveBranch,
+  archiveDate,
+  type ArchiveResult,
+  archiveTag,
+  branchActivity,
+  defaultArchiveDir,
+  describeArchive,
+  idleDays,
+  isStale,
+  run,
+} from './prune-stale.js';
 import { releaseBranchResources, stopServices } from './teardown.js';
 
-/** `gh pr list --limit`. Hitting it means older PRs are missing from the answer. */
-export const PR_LIST_LIMIT = 500;
+export type { PullRequest, RepoPullRequests } from './prune-github.js';
+export {
+  fetchPullRequests,
+  latestPullRequests,
+  lookupPullRequests,
+  PR_LIST_LIMIT,
+} from './prune-github.js';
 
-export interface PullRequest {
-  headRefName: string;
-  headRefOid: string;
-  isCrossRepository: boolean;
-  number: number;
-  state: string;
-}
+/** Days without activity after which an unfinished branch is archived and removed. */
+export const DEFAULT_STALE_DAYS = 7;
 
-export interface RepoPullRequests {
-  /** The repo's default branch on GitHub, never touched (besides `main`). */
-  defaultBranch?: string;
-  pullRequests: PullRequest[];
-}
+/** Branches without a PR under these prefixes are parked: never removed. */
+export const DEFAULT_KEEP_PREFIXES = ['park/'];
 
 export interface WorktreeEntry {
   /** Short branch name, absent for a detached HEAD. */
   branch?: string;
   path: string;
+  /** The directory is gone; `git worktree prune` would drop the entry. */
+  prunable?: boolean;
 }
 
 export interface PruneOptions {
   /** Actually remove; otherwise only print what would happen. */
   apply?: boolean;
+  /** Where patches of uncommitted work go. Defaults to `defaultArchiveDir(mainRoot)`. */
+  archiveDir?: string;
   /** Full worktree config when the repo has one; enables the teardown path. */
   cfg?: WorktreeConfig | null;
   /** Root of the worktree the command runs from. Defaults to `git rev-parse --show-toplevel`. */
@@ -39,18 +59,28 @@ export interface PruneOptions {
   err?: (line: string) => void;
   /** Also remove branches whose PR was closed without merge. */
   includeClosed?: boolean;
+  /** Prefixes that park a branch without a PR. Defaults to `DEFAULT_KEEP_PREFIXES`. */
+  keepPrefixes?: string[];
+  /** PRs of one head branch (tests). When absent, `gh pr list --head` is called. */
+  lookupPullRequests?: (branch: string) => PullRequest[];
   /** Main checkout (first entry of `git worktree list`). */
   mainRoot: string;
+  /** Current time in epoch ms (tests). */
+  now?: number;
   out?: (line: string) => void;
   protectedBranches?: string[];
   /** Pre-fetched PRs (tests). When absent, `gh` is called once. */
   pullRequests?: RepoPullRequests;
   /** Also delete remote branches of merged PRs that GitHub left behind. */
   remote?: boolean;
+  /** Idle days before an unfinished branch is archived and removed. */
+  staleDays?: number;
 }
 
 export interface PruneResult {
   failed: number;
+  /** Registry slots freed because their worktree was gone. */
+  freed: number;
   kept: number;
   removed: number;
 }
@@ -58,69 +88,92 @@ export interface PruneResult {
 export type BranchDecision =
   | { action: 'ignore'; branch: string; reason: string }
   | { action: 'keep'; branch: string; reason: string }
-  | { action: 'remove'; branch: string; pr: PullRequest; tip: string; worktree?: string };
+  | {
+      action: 'remove';
+      /** Tag the tip (and save uncommitted work) before removing. */
+      archive: boolean;
+      branch: string;
+      dirty: boolean;
+      pr?: PullRequest;
+      reason: string;
+      tip: string;
+      worktree?: string;
+    };
 
 export interface ClassifyInput {
   branch: string;
   /** Root of the worktree the command runs from. */
   cwdWorktree?: string;
   includeClosed: boolean;
+  keepPrefixes?: string[];
+  /** Last activity on the branch, epoch ms (see `branchActivity`). */
+  lastActivity: number;
   /** Branch names never removed: `main`, the default branch, the main checkout's branch, protected. */
   neverTouch: Map<string, string>;
+  /** Current time, epoch ms. */
+  now: number;
   pr?: PullRequest;
+  /** The one-by-one PR lookup failed, so whether the branch has a PR is unknown. */
+  prUnknown?: boolean;
   /** `git status --porcelain` of the worktree, or null when it can't be read. */
   readStatus: (path: string) => string | null;
+  staleDays?: number;
   tip: string;
   worktree?: string;
 }
 
 /** Decide what prune does with one local branch. Pure apart from `readStatus`. */
 export function classifyBranch(input: ClassifyInput): BranchDecision {
-  const { branch, pr, tip, worktree } = input;
+  const { branch, now, pr, tip, worktree } = input;
+  const staleDays = input.staleDays ?? DEFAULT_STALE_DAYS;
+  const keep = (reason: string): BranchDecision => ({ action: 'keep', branch, reason });
+  const ignore = (reason: string): BranchDecision => ({ action: 'ignore', branch, reason });
+  const at = worktree ? { worktree } : {};
+
   const reserved = input.neverTouch.get(branch);
-  if (reserved) return { action: 'keep', branch, reason: reserved };
-
-  if (!pr) return { action: 'ignore', branch, reason: 'no PR: review by hand' };
-  const label = `PR #${pr.number} ${pr.state}`;
-  if (pr.state === 'OPEN') return { action: 'keep', branch, reason: label };
-  if (pr.state === 'CLOSED' && !input.includeClosed) {
-    return { action: 'keep', branch, reason: `${label}: pass --include-closed to remove` };
+  if (reserved) return keep(reserved);
+  if (worktree && input.cwdWorktree && worktree === input.cwdWorktree) {
+    return keep(`${worktree} is the current worktree: run from another one`);
   }
-  if (pr.state !== 'MERGED' && pr.state !== 'CLOSED') {
-    return { action: 'keep', branch, reason: label };
-  }
-  if (tip !== pr.headRefOid) {
-    return { action: 'keep', branch, reason: `${label}, but the local tip is not the PR head` };
-  }
-
+  let dirty = false;
   if (worktree) {
-    if (input.cwdWorktree && worktree === input.cwdWorktree) {
-      return {
-        action: 'keep',
-        branch,
-        reason: `${label}, but ${worktree} is the current worktree: run from another one`,
-      };
-    }
     const status = input.readStatus(worktree);
-    if (status === null) {
-      return {
-        action: 'keep',
-        branch,
-        reason: `${label}, but the status of ${worktree} can't be read`,
-      };
-    }
-    if (status.trim() !== '') {
-      return {
-        action: 'keep',
-        branch,
-        reason: `${label}, but ${worktree} has uncommitted changes`,
-      };
-    }
+    if (status === null) return keep(`the status of ${worktree} can't be read`);
+    dirty = status.trim() !== '';
   }
+  if (input.prUnknown) return keep('the PR lookup failed: run again');
 
-  return worktree
-    ? { action: 'remove', branch, pr, tip, worktree }
-    : { action: 'remove', branch, pr, tip };
+  if (!pr) {
+    const prefix = (input.keepPrefixes ?? DEFAULT_KEEP_PREFIXES).find((p) => branch.startsWith(p));
+    if (prefix) return ignore(`no PR, parked under ${prefix}`);
+  }
+  const label = pr ? `PR #${pr.number} ${pr.state}` : 'no PR';
+  if (pr && pr.state !== 'MERGED' && pr.state !== 'CLOSED') return keep(label);
+
+  let problem: string;
+  if (!pr) problem = label;
+  else if (pr.state === 'CLOSED' && !input.includeClosed) {
+    problem = `${label}: pass --include-closed to remove`;
+  } else if (tip !== pr.headRefOid) problem = `${label}, but the local tip is not the PR head`;
+  else if (dirty) problem = `${label}, but ${worktree} has uncommitted changes`;
+  else return { action: 'remove', archive: false, branch, dirty, pr, reason: label, tip, ...at };
+
+  const idle = idleDays(now, input.lastActivity);
+  if (isStale(now, input.lastActivity, staleDays)) {
+    const reason = `${problem}, idle ${idle}d`;
+    return {
+      action: 'remove',
+      archive: true,
+      branch,
+      dirty,
+      ...(pr ? { pr } : {}),
+      reason,
+      tip,
+      ...at,
+    };
+  }
+  const pending = `${problem}; idle ${idle}d, archived and removed after ${staleDays}d idle`;
+  return pr ? keep(pending) : ignore(pending);
 }
 
 /** Parse `git worktree list --porcelain`. The first entry is the main checkout. */
@@ -133,52 +186,11 @@ export function parseWorktreeList(porcelain: string): WorktreeEntry[] {
       entries.push(current);
     } else if (current && line.startsWith('branch refs/heads/')) {
       current.branch = line.slice('branch refs/heads/'.length);
+    } else if (current && (line === 'prunable' || line.startsWith('prunable '))) {
+      current.prunable = true;
     }
   }
   return entries;
-}
-
-/** Most recent same-repo PR per head branch name. Fork PRs are dropped. */
-export function latestPullRequests(prs: PullRequest[]): Map<string, PullRequest> {
-  const byHead = new Map<string, PullRequest>();
-  for (const pr of prs) {
-    if (pr.isCrossRepository) continue;
-    const seen = byHead.get(pr.headRefName);
-    if (!seen || pr.number > seen.number) byHead.set(pr.headRefName, pr);
-  }
-  return byHead;
-}
-
-/** One `gh repo view` plus one `gh pr list` for the whole repo. */
-export function fetchPullRequests(mainRoot: string, err: (line: string) => void): RepoPullRequests {
-  const repo = JSON.parse(
-    run('gh', ['repo', 'view', '--json', 'nameWithOwner,defaultBranchRef'], mainRoot),
-  ) as { defaultBranchRef?: { name?: string }; nameWithOwner: string };
-  const pullRequests = JSON.parse(
-    run(
-      'gh',
-      [
-        'pr',
-        'list',
-        '--repo',
-        repo.nameWithOwner,
-        '--state',
-        'all',
-        '--limit',
-        String(PR_LIST_LIMIT),
-        '--json',
-        'headRefName,state,number,headRefOid,isCrossRepository',
-      ],
-      mainRoot,
-    ),
-  ) as PullRequest[];
-  if (pullRequests.length >= PR_LIST_LIMIT) {
-    err(
-      `warning: gh returned ${PR_LIST_LIMIT} PRs, the limit; branches of older PRs show up as having no PR`,
-    );
-  }
-  const defaultBranch = repo.defaultBranchRef?.name;
-  return defaultBranch ? { defaultBranch, pullRequests } : { pullRequests };
 }
 
 export async function prune(opts: PruneOptions): Promise<PruneResult> {
@@ -188,13 +200,20 @@ export async function prune(opts: PruneOptions): Promise<PruneResult> {
   const includeClosed = opts.includeClosed ?? false;
   const cfg = opts.cfg ?? null;
   const { mainRoot } = opts;
+  const now = opts.now ?? Date.now();
+  const staleDays = opts.staleDays ?? DEFAULT_STALE_DAYS;
+  const keepPrefixes = opts.keepPrefixes ?? DEFAULT_KEEP_PREFIXES;
+  const archiveDir = opts.archiveDir ?? defaultArchiveDir(mainRoot);
+  const date = archiveDate(now);
   const git = (args: string[]): string => run('git', ['-C', mainRoot, ...args]);
 
+  // Worktrees whose directory is gone would block `git branch -D`.
+  if (apply) git(['worktree', 'prune']);
   const worktrees = parseWorktreeList(git(['worktree', 'list', '--porcelain']));
   const mainCheckout = worktrees[0];
   const worktreeOf = new Map<string, string>();
   for (const wt of worktrees.slice(1)) {
-    if (wt.branch && !worktreeOf.has(wt.branch)) worktreeOf.set(wt.branch, wt.path);
+    if (wt.branch && !wt.prunable && !worktreeOf.has(wt.branch)) worktreeOf.set(wt.branch, wt.path);
   }
 
   const repoPrs = opts.pullRequests ?? fetchPullRequests(mainRoot, err);
@@ -207,22 +226,56 @@ export async function prune(opts: PruneOptions): Promise<PruneResult> {
   if (mainCheckout?.branch) neverTouch.set(mainCheckout.branch, 'checked out in the main checkout');
   for (const b of opts.protectedBranches ?? []) neverTouch.set(b, 'protected in worktree.prune');
 
-  const cwdWorktree = opts.cwdWorktree ?? findRepoRoot();
-  const result: PruneResult = { failed: 0, kept: 0, removed: 0 };
+  const { nameWithOwner } = repoPrs;
+  const lookup =
+    opts.lookupPullRequests ??
+    (nameWithOwner ? (b: string) => lookupPullRequests(mainRoot, nameWithOwner, b) : undefined);
+  const looked = new Set<string>();
+  const prUnknown = new Set<string>();
+  const prFor = (branch: string): PullRequest | undefined => {
+    const known = prByHead.get(branch);
+    if (known || !repoPrs.truncated || !lookup || neverTouch.has(branch) || looked.has(branch)) {
+      return known;
+    }
+    looked.add(branch);
+    try {
+      const found = latestPullRequests(lookup(branch)).get(branch);
+      if (found) prByHead.set(branch, found);
+      return found;
+    } catch (e) {
+      prUnknown.add(branch);
+      err(`warning: looking up the PR of ${branch} failed (${firstLine(e)})`);
+      return undefined;
+    }
+  };
 
-  const refs = git(['for-each-ref', '--format=%(refname)%09%(objectname)', 'refs/heads/']);
+  const cwdWorktree = opts.cwdWorktree ?? findRepoRoot();
+  const result: PruneResult = { failed: 0, freed: 0, kept: 0, removed: 0 };
+  /** Branches whose "would remove" line already reports the slot it frees. */
+  const slotReported = new Set<string>();
+
+  const refs = git([
+    'for-each-ref',
+    '--format=%(refname)%09%(objectname)%09%(committerdate:unix)',
+    'refs/heads/',
+  ]);
   for (const line of refs.split('\n')) {
     if (!line) continue;
-    const [ref = '', tip = ''] = line.split('\t');
+    const [ref = '', tip = '', tipTime = '0'] = line.split('\t');
     const branch = ref.replace(/^refs\/heads\//, '');
     const worktree = worktreeOf.get(branch);
-    const pr = prByHead.get(branch);
+    const pr = prFor(branch);
     const decision = classifyBranch({
       branch,
       cwdWorktree,
       includeClosed,
+      keepPrefixes,
+      lastActivity: branchActivity(mainRoot, branch, Number(tipTime) * 1000, worktree),
       neverTouch,
+      now,
+      prUnknown: prUnknown.has(branch),
       readStatus,
+      staleDays,
       tip,
       ...(pr ? { pr } : {}),
       ...(worktree ? { worktree } : {}),
@@ -236,22 +289,50 @@ export async function prune(opts: PruneOptions): Promise<PruneResult> {
 
     // Reading a missing registry would create it; a dry run must not write.
     const entry = cfg && existsSync(cfg.portRegistry) ? await getBranchEntry(cfg, branch) : null;
-    const what = `${branch} (PR #${decision.pr.number} ${decision.pr.state}, tip ${tip.slice(0, 7)})${
+    const what = `${branch} (${decision.reason}, tip ${tip.slice(0, 7)})${
       decision.worktree ? ` and ${decision.worktree}` : ''
     }${entry ? `, frees slot ${entry.slot}` : ''}`;
     if (!apply) {
-      out(`${pad('would remove')}${what}`);
+      if (entry) slotReported.add(branch);
+      const archives = decision.archive
+        ? `; archives as ${archiveTag(date, branch)}${
+            decision.dirty ? ' plus the uncommitted changes' : ''
+          }`
+        : '';
+      out(`${pad('would remove')}${what}${archives}`);
       result.removed++;
       continue;
     }
 
+    let archived: ArchiveResult | null = null;
+    if (decision.archive) {
+      try {
+        archived = archiveBranch({
+          archiveDir,
+          branch,
+          date,
+          dirty: decision.dirty,
+          git,
+          reason: decision.reason,
+          tip,
+          ...(decision.worktree ? { worktree: decision.worktree } : {}),
+        });
+      } catch (e) {
+        out(`${pad('FAILED')}${branch}: archiving failed, nothing was deleted (${firstLine(e)})`);
+        result.failed++;
+        continue;
+      }
+    }
+    const saved = archived ? `; ${describeArchive(archived)}` : '';
+
     if (cfg && entry) await stopServices(cfg, entry);
     if (decision.worktree) {
       try {
-        git(['worktree', 'remove', decision.worktree]);
+        // --force only after the archive saved the uncommitted work.
+        git(['worktree', 'remove', ...(archived ? ['--force'] : []), decision.worktree]);
       } catch (e) {
         out(
-          `${pad('FAILED')}${branch}: worktree ${decision.worktree} was not removed, nothing was deleted (${firstLine(e)})`,
+          `${pad('FAILED')}${branch}: worktree ${decision.worktree} was not removed, nothing was deleted (${firstLine(e)})${saved}`,
         );
         result.failed++;
         continue;
@@ -261,86 +342,87 @@ export async function prune(opts: PruneOptions): Promise<PruneResult> {
       git(['branch', '-D', branch]);
     } catch (e) {
       const prefix = decision.worktree ? 'the worktree was removed, but ' : '';
-      out(`${pad('FAILED')}${branch}: ${prefix}the branch was not deleted (${firstLine(e)})`);
+      out(
+        `${pad('FAILED')}${branch}: ${prefix}the branch was not deleted (${firstLine(e)})${saved}`,
+      );
       result.failed++;
       continue;
     }
     if (cfg && entry) await releaseBranchResources(cfg, branch);
-    out(`${pad('removed')}${what}`);
+    out(`${pad('removed')}${what}${saved}`);
     result.removed++;
   }
 
-  if (opts.remote) pruneRemote({ apply, git, includeClosed, neverTouch, out, prByHead, result });
+  if (cfg && existsSync(cfg.portRegistry)) {
+    const live = new Set<string>();
+    for (const wt of worktrees) if (wt.branch && !wt.prunable) live.add(wt.branch);
+    if (mainCheckout?.branch) live.add(mainCheckout.branch);
+    await collectRegistryGarbage({ apply, cfg, err, live, out, result, slotReported });
+  }
+
+  if (opts.remote) {
+    pruneRemote({
+      apply,
+      date,
+      git,
+      includeClosed,
+      neverTouch,
+      now,
+      out,
+      prFor,
+      result,
+      staleDays,
+    });
+  }
 
   out('');
   if (apply) {
     git(['worktree', 'prune']);
-    out(`${result.removed} removed, ${result.kept} kept, ${result.failed} failed.`);
+    out(
+      `${result.removed} removed, ${result.freed} slots freed, ${result.kept} kept, ${result.failed} failed.`,
+    );
   } else {
-    out(`${result.removed} would be removed, ${result.kept} kept. Run with --yes to apply.`);
+    out(
+      `${result.removed} would be removed, ${result.freed} slots would be freed, ${result.kept} kept. Run with --yes to apply.`,
+    );
   }
   return result;
 }
 
-interface RemoteContext {
+interface RegistryGcContext {
   apply: boolean;
-  git: (args: string[]) => string;
-  includeClosed: boolean;
-  neverTouch: Map<string, string>;
+  cfg: WorktreeConfig;
+  err: (line: string) => void;
+  /** Branches checked out in a worktree that still exists. */
+  live: Set<string>;
   out: (line: string) => void;
-  prByHead: Map<string, PullRequest>;
   result: PruneResult;
+  /** Dry run: branches whose "would remove" line already says it frees the slot. */
+  slotReported: Set<string>;
 }
 
-/** Remote branches of merged (or closed) PRs whose tip is still the PR head. */
-function pruneRemote(ctx: RemoteContext): void {
-  const { git, out, result } = ctx;
-  let heads: string;
-  try {
-    heads = git(['ls-remote', '--heads', 'origin']);
-  } catch (e) {
-    out(`${pad('FAILED')}--remote: could not list the branches on origin (${firstLine(e)})`);
-    result.failed++;
-    return;
-  }
-
-  for (const line of heads.split('\n')) {
-    if (!line) continue;
-    const [tip = '', ref = ''] = line.split('\t');
-    const branch = ref.replace(/^refs\/heads\//, '');
-    const label = `origin/${branch}`;
-    const pr = ctx.prByHead.get(branch);
-    if (!pr) continue;
-    const eligible = pr.state === 'MERGED' || (pr.state === 'CLOSED' && ctx.includeClosed);
-    if (!eligible) continue;
-    const reserved = ctx.neverTouch.get(branch);
-    if (reserved) {
-      out(`${pad('kept')}${label} (${reserved})`);
-      result.kept++;
-      continue;
-    }
-    if (tip !== pr.headRefOid) {
-      out(
-        `${pad('kept')}${label} (PR #${pr.number} ${pr.state}, but the remote tip is not the PR head)`,
-      );
-      result.kept++;
-      continue;
-    }
-    const what = `${label} (PR #${pr.number} ${pr.state}, tip ${tip.slice(0, 7)})`;
+/**
+ * Registry entries whose worktree is gone keep their slot, and often a dev
+ * server, forever. Stop the servers and free the slot.
+ */
+async function collectRegistryGarbage(ctx: RegistryGcContext): Promise<void> {
+  const { cfg, out, result } = ctx;
+  const registry = await readRegistry(cfg);
+  for (const [branch, entry] of Object.entries(registry)) {
+    if (ctx.live.has(branch) || ctx.slotReported.has(branch)) continue;
     if (!ctx.apply) {
-      out(`${pad('would remove')}${what}`);
-      result.removed++;
+      out(`${pad('would free')}slot ${entry.slot} of ${branch} (worktree gone)`);
+      result.freed++;
       continue;
     }
     try {
-      git(['push', 'origin', '--delete', branch]);
+      await stopServices(cfg, entry);
     } catch (e) {
-      out(`${pad('FAILED')}${label}: git push origin --delete failed (${firstLine(e)})`);
-      result.failed++;
-      continue;
+      ctx.err(`warning: could not stop the servers of ${branch} (${firstLine(e)})`);
     }
-    out(`${pad('removed')}${what}`);
-    result.removed++;
+    await releaseBranchResources(cfg, branch);
+    out(`${pad('freed')}slot ${entry.slot} of ${branch} (worktree gone)`);
+    result.freed++;
   }
 }
 
@@ -350,22 +432,4 @@ function readStatus(path: string): string | null {
   } catch {
     return null;
   }
-}
-
-function run(cmd: string, args: string[], cwd?: string): string {
-  return execFileSync(cmd, args, {
-    encoding: 'utf-8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    ...(cwd ? { cwd } : {}),
-  });
-}
-
-function pad(label: string): string {
-  return label.padEnd(13);
-}
-
-function firstLine(e: unknown): string {
-  const stderr = (e as { stderr?: Buffer | string }).stderr?.toString().trim();
-  const msg = stderr || (e as Error).message || String(e);
-  return msg.split('\n')[0] ?? msg;
 }
