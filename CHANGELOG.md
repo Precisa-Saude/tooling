@@ -1,3 +1,9 @@
+## [3.5.0](https://github.com/Precisa-Saude/tooling/compare/v3.4.1...v3.5.0) (2026-11-12)
+
+### Features
+
+* **worktree-cli:** prune arquiva e remove branches paradas há mais de staleDays ([#74](https://github.com/Precisa-Saude/tooling/issues/74)) ([8f43a7d](https://github.com/Precisa-Saude/tooling/commit/8f43a7d44f5a6de15781ed91fce059d8fce38665))
+
 ## [3.4.1](https://github.com/Precisa-Saude/tooling/compare/v3.4.0...v3.4.1) (2026-11-11)
 
 ### Bug Fixes
