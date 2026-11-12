@@ -45,6 +45,40 @@ caminhos continua sendo responsabilidade do consumidor. Falhas não registram o
 conteúdo bloqueado, e respostas de erro dos provedores não são copiadas ao log.
 Cada rodada usa o diff completo autorizado entre base e head do PR.
 
+### Artefato de auditoria
+
+Toda execução do job de revisão publica o artefato
+`automated-review-<pr>-round<N>-attempt<A>`, retido por 30 dias. Ele existe
+porque o runner self-hosted apaga o `RUNNER_TEMP` ao fim do job, e sem ele não
+há como saber o que o modelo devolveu quando a revisão diz "No issues found" e
+erra. O upload roda mesmo quando a chamada aos provedores falha.
+
+O artefato contém:
+
+- `attempt-<n>-<provedor>.response.json` (ou `.txt`, se o corpo não for JSON):
+  o corpo bruto da resposta de cada provedor tentado, inclusive os que
+  falharam, com campos como `choices[0].message.reasoning` quando o modelo os
+  devolve. Cabeçalhos de requisição e resposta não são gravados, e qualquer
+  ocorrência das chaves de API no corpo vira `[REDACTED]`;
+- `review.json`: a revisão extraída que vira o comentário;
+- `meta.json`: modelo pedido e modelo que respondeu, provedor (e, no OpenRouter,
+  o provedor que de fato atendeu), `finish_reason`, tokens de entrada, saída e
+  raciocínio, tamanho do diff em bytes (total e enviado), número de arquivos e
+  se o diff foi truncado.
+
+O diff (`pr.diff`) não entra no artefato. Ele já saiu para um provedor externo
+sob a política, e uma segunda cópia do código nos artefatos do Actions só
+aumentaria a exposição. A resposta do modelo pode citar trechos do diff, então
+o artefato tem a mesma sensibilidade do código revisado: quem lê os artefatos
+do repositório consumidor consegue lê-lo. Em repositório público, isso inclui
+qualquer pessoa com conta no GitHub.
+
+O log do job continua sem o corpo das respostas. Ele mostra uma linha por
+tentativa com provedor, modelo, status HTTP, `finish_reason` e tokens de
+entrada, saída e raciocínio. O rodapé do comentário mostra os tokens de
+raciocínio quando o provedor os informa e um link para o artefato (ou para o
+run, se o upload falhar).
+
 ## Permissões e publicação
 
 Checks usam `contents: read`, não recebem segredos e não persistem credenciais

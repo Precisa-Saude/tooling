@@ -230,6 +230,8 @@ jobs:
             output('head_sha', pr.head.sha);
             output('number', number);
             output('diff_truncated', String(bytes.length > max));
+            output('diff_bytes', String(bytes.length));
+            output('diff_bytes_sent', String(Math.min(bytes.length, max)));
             output('enabled', String(files.length > 0 && diff.length > 0));
           }
           SCRIPT
@@ -247,7 +249,11 @@ jobs:
           REVIEW_INPUT_DIR: ${{ steps.pr.outputs.input_dir }}
           REVIEW_PROVIDERS: ${{ steps.pr.outputs.providers }}
           DIFF_TRUNCATED: ${{ steps.pr.outputs.diff_truncated }}
+          DIFF_BYTES: ${{ steps.pr.outputs.diff_bytes }}
+          DIFF_BYTES_SENT: ${{ steps.pr.outputs.diff_bytes_sent }}
           REVIEW_ROUND: ${{ needs.check-review-status.outputs.review_round }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
         run: |
           node << 'SCRIPT'
           const fs = require('fs');
@@ -328,9 +334,13 @@ jobs:
           const openAiCompatible = {
             extractText: (r) => r?.choices?.[0]?.message?.content ?? '',
             extractTruncated: (r) => r?.choices?.[0]?.finish_reason === 'length',
+            extractFinish: (r) => r?.choices?.[0]?.finish_reason ?? null,
+            // reasoning_tokens só vem de modelos de raciocínio (OpenAI e
+            // OpenRouter); já está contado em completion_tokens.
             extractUsage: (r) => ({
               prompt_tokens: r?.usage?.prompt_tokens ?? 0,
               completion_tokens: r?.usage?.completion_tokens ?? 0,
+              reasoning_tokens: r?.usage?.completion_tokens_details?.reasoning_tokens ?? null,
             }),
             extractError: (r) => r?.error?.message ?? 'see workflow logs',
           };
@@ -361,9 +371,11 @@ jobs:
                 .map((block) => block.text ?? '')
                 .join(''),
               extractTruncated: (r) => r?.stop_reason === 'max_tokens',
+              extractFinish: (r) => r?.stop_reason ?? null,
               extractUsage: (r) => ({
                 prompt_tokens: r?.usage?.input_tokens ?? 0,
                 completion_tokens: r?.usage?.output_tokens ?? 0,
+                reasoning_tokens: null,
               }),
               extractError: (r) => r?.error?.message ?? r?.message ?? 'see workflow logs',
             },
@@ -466,13 +478,17 @@ jobs:
             }
           }
 
+          // A tentativa guarda o corpo bruto da resposta (rawText) para o
+          // artefato de auditoria. Cabeçalhos de requisição e resposta nunca
+          // entram nele, e o corpo nunca vai para o log.
           async function tryProvider(name) {
             const p = providers[name];
             const key = process.env[p.envKey];
-            if (!key) return { ok: false, reason: 'no key configured', skip: true };
+            if (!key) return { ok: false, reason: 'no key configured', skip: true, provider: name };
 
             const model = process.env[p.modelEnv] || p.defaultModel;
             const req = p.build(model, key);
+            const result = { provider: name, model };
 
             try {
               const resp = await fetch(req.url, {
@@ -480,49 +496,118 @@ jobs:
                 headers: req.headers,
                 body: req.body,
               });
+              result.status = resp.status;
               const text = await resp.text();
+              result.rawText = text;
               let parsed;
               try {
                 parsed = JSON.parse(text);
               } catch {
-                return { ok: false, reason: `HTTP ${resp.status}: non-JSON response`, provider: name, model };
+                return { ...result, ok: false, reason: `HTTP ${resp.status}: non-JSON response` };
               }
+              result.parsed = parsed;
+              result.finishReason = p.extractFinish(parsed);
+              result.usage = p.extractUsage(parsed);
               if (!resp.ok) {
-                return {
-                  ok: false,
-                  reason: `HTTP ${resp.status}`,
-                  provider: name,
-                  model,
-                };
+                return { ...result, ok: false, reason: `HTTP ${resp.status}` };
               }
               const reviewText = p.extractText(parsed);
-              const usage = p.extractUsage(parsed);
               // HTTP 200 não garante revisão utilizável. Resposta cortada no
               // limite, vazia ou fora do formato JSON conta como falha, para
               // que o próximo provedor autorizado seja tentado em vez de
               // publicar um comentário em branco.
               if (p.extractTruncated(parsed)) {
-                return { ok: false, reason: 'resposta truncada no limite de tokens', provider: name, model };
+                return { ...result, ok: false, reason: 'resposta truncada no limite de tokens' };
               }
               if (!reviewText.trim()) {
-                return { ok: false, reason: 'resposta vazia', provider: name, model };
+                return { ...result, ok: false, reason: 'resposta vazia' };
               }
               if (!parseReview(reviewText)) {
-                return { ok: false, reason: 'resposta não é um JSON de revisão válido', provider: name, model };
+                return { ...result, ok: false, reason: 'resposta não é um JSON de revisão válido' };
               }
-              return { ok: true, provider: name, model, reviewText, usage };
+              return { ...result, ok: true, reviewText };
             } catch (e) {
-              return { ok: false, reason: 'network error', provider: name, model };
+              return { ...result, ok: false, reason: 'network error' };
             }
           }
 
+          // Campo vindo do provedor só entra no log se for um identificador
+          // simples; isso impede que a resposta injete comandos de workflow.
+          const logValue = (value) => {
+            if (value === null || value === undefined || value === '') return '-';
+            const text = String(value);
+            return /^[\w.:/+-]{1,80}$/.test(text) ? text : 'invalid';
+          };
+
+          // Remove do artefato qualquer chave que o provedor ecoe na resposta.
+          const secrets = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'GITHUB_TOKEN']
+            .map((name) => process.env[name])
+            .filter((value) => typeof value === 'string' && value.length >= 8);
+          const redact = (text) =>
+            secrets.reduce((out, secret) => out.split(secret).join('[REDACTED]'), text);
+
           (async () => {
+            // Diretório próprio do artefato de auditoria, separado do diff
+            // (pr.diff nunca entra no artefato).
+            const auditDir = fs.mkdtempSync(join(process.env.RUNNER_TEMP, 'review-audit-'));
+            setOutput('audit_dir', auditDir);
+            const meta = {
+              pr_number: process.env.PR_NUMBER || null,
+              head_sha: process.env.HEAD_SHA || null,
+              round,
+              diff_bytes: process.env.DIFF_BYTES ? Number(process.env.DIFF_BYTES) : null,
+              diff_bytes_sent: process.env.DIFF_BYTES_SENT ? Number(process.env.DIFF_BYTES_SENT) : null,
+              diff_truncated: truncated,
+              file_count: files ? files.split('\n').length : 0,
+              providers: order,
+              attempts: [],
+              result: null,
+            };
+            const writeMeta = () =>
+              fs.writeFileSync(join(auditDir, 'meta.json'), `${JSON.stringify(meta, null, 2)}\n`);
+            writeMeta();
+
             const attempts = [];
             let winner = null;
 
             for (const name of order) {
               const attempt = await tryProvider(name);
               attempts.push(attempt);
+              const index = attempts.length;
+
+              let responseFile = null;
+              if (typeof attempt.rawText === 'string') {
+                responseFile = `attempt-${index}-${name}.response.${attempt.parsed === undefined ? 'txt' : 'json'}`;
+                fs.writeFileSync(join(auditDir, responseFile), redact(attempt.rawText));
+              }
+              const usage = attempt.usage ?? {};
+              const record = {
+                attempt: index,
+                provider: name,
+                model: attempt.model ?? null,
+                response_model: typeof attempt.parsed?.model === 'string' ? attempt.parsed.model : null,
+                // O OpenRouter informa qual provedor de fato atendeu o modelo.
+                upstream_provider: typeof attempt.parsed?.provider === 'string' ? attempt.parsed.provider : null,
+                http_status: attempt.status ?? null,
+                finish_reason: attempt.finishReason ?? null,
+                prompt_tokens: usage.prompt_tokens ?? null,
+                completion_tokens: usage.completion_tokens ?? null,
+                reasoning_tokens: usage.reasoning_tokens ?? null,
+                ok: attempt.ok,
+                skipped: attempt.skip === true,
+                reason: attempt.ok ? null : attempt.reason,
+                response_file: responseFile,
+              };
+              meta.attempts.push(record);
+              writeMeta();
+              console.log(
+                `Attempt ${index}/${order.length}: provider=${name} model=${logValue(record.model)}` +
+                  ` http=${logValue(record.http_status)} finish_reason=${logValue(record.finish_reason)}` +
+                  ` prompt_tokens=${logValue(record.prompt_tokens)} completion_tokens=${logValue(record.completion_tokens)}` +
+                  ` reasoning_tokens=${logValue(record.reasoning_tokens)}` +
+                  ` result=${attempt.ok ? 'ok' : attempt.skip ? 'skipped' : 'failed'}`,
+              );
+
               if (attempt.ok) {
                 winner = attempt;
                 break;
@@ -545,10 +630,15 @@ jobs:
                 setOutput('status', 'error');
                 setOutput('error_reason', reasons);
               }
+              meta.result = { status: configured.length === 0 ? 'skipped' : 'error', provider: null, model: null };
+              writeMeta();
               return;
             }
 
             fs.writeFileSync(join(inputDir, 'review.json'), winner.reviewText);
+            fs.writeFileSync(join(auditDir, 'review.json'), redact(winner.reviewText));
+            meta.result = { status: 'ok', provider: winner.provider, model: winner.model };
+            writeMeta();
             setOutput('status', 'ok');
             setOutput('provider_label', providers[winner.provider].label);
             setOutput('provider_model', winner.model);
@@ -558,6 +648,8 @@ jobs:
             const cost = computeCost(winner.model, promptTokens, completionTokens);
             setOutput('prompt_tokens', String(promptTokens));
             setOutput('completion_tokens', String(completionTokens));
+            const reasoningTokens = winner.usage.reasoning_tokens;
+            setOutput('reasoning_tokens', Number.isFinite(reasoningTokens) ? String(reasoningTokens) : '');
             setOutput('cost_usd', cost == null ? '' : cost.toFixed(4));
 
             const failed = attempts.filter((a) => !a.ok && !a.skip);
@@ -572,9 +664,27 @@ jobs:
           })();
           SCRIPT
 
+      # Guarda a resposta bruta de cada provedor, a revisão extraída e o
+      # meta.json, porque o self-hosted apaga o RUNNER_TEMP ao fim do job. Roda
+      # mesmo se a chamada falhar. O diff não entra: já foi a um provedor
+      # externo sob a política e não precisa de outra cópia nos artefatos.
+      - name: Upload review audit
+        id: audit
+        if: always() && steps.call.outputs.audit_dir != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: automated-review-${{ inputs.pr_number }}-round${{ needs.check-review-status.outputs.review_round }}-attempt${{ github.run_attempt }}
+          path: ${{ steps.call.outputs.audit_dir }}
+          retention-days: 30
+          if-no-files-found: ignore
+
       - name: Post review
         if: steps.pr.outputs.enabled == 'true'
         env:
+          REASONING_TOKENS: ${{ steps.call.outputs.reasoning_tokens }}
+          AUDIT_ARTIFACT_URL: ${{ steps.audit.outputs.artifact-url }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
           REVIEW_ROUND: ${{ needs.check-review-status.outputs.review_round }}
@@ -604,12 +714,23 @@ jobs:
             const costUsd = process.env.COST_USD;
             const fellBack = process.env.FELL_BACK === 'true';
 
+            const reasoningRaw = process.env.REASONING_TOKENS;
+            const artifactUrl = process.env.AUDIT_ARTIFACT_URL;
+            const runUrl = process.env.RUN_URL;
+
             const fmt = (n) => n.toLocaleString('en-US');
             const costPart = costUsd ? ` | $${costUsd}` : '';
+            // Tokens de raciocínio já estão incluídos no total de saída.
+            const reasoningPart = reasoningRaw ? ` (${fmt(Number(reasoningRaw))} reasoning)` : '';
             const usagePart = promptTokens + completionTokens > 0
-              ? ` | ${fmt(promptTokens)} in / ${fmt(completionTokens)} out${costPart}`
+              ? ` | ${fmt(promptTokens)} in / ${fmt(completionTokens)} out${reasoningPart}${costPart}`
               : '';
             const fallbackBadge = fellBack ? ' (fallback)' : '';
+            // Sem URL do artefato (upload falhou), o link aponta para o run.
+            const auditLink = artifactUrl
+              ? `[audit artifact](${artifactUrl})`
+              : runUrl ? `[run](${runUrl})` : '';
+            const auditPart = auditLink ? ` | ${auditLink}` : '';
 
             // Caminhos de falha — sem marker, de modo que o próximo push
             // retenta como Round 1.
@@ -621,7 +742,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
-                body: `### Automated Review — not posted\n\n${note}`,
+                body: `### Automated Review — not posted\n\n${note}${auditLink ? `\n\n*Audit: ${auditLink}*` : ''}`,
               });
               return;
             }
@@ -640,7 +761,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
-                body: `## Automated Review (Round ${round})\n\n${content}\n\n---\n*Reviewed by ${providerLabel} ${providerModel}${fallbackBadge}${usagePart}*`,
+                body: `## Automated Review (Round ${round})\n\n${content}\n\n---\n*Reviewed by ${providerLabel} ${providerModel}${fallbackBadge}${usagePart}${auditPart}*`,
               });
               return;
             }
@@ -659,7 +780,7 @@ jobs:
             body += feedback.length === 0
               ? `:white_check_mark: No issues found\n\n`
               : `:mag: Found ${feedback.length} suggestion${feedback.length === 1 ? '' : 's'} (see inline comments)\n\n`;
-            body += `*Reviewed by ${providerLabel} ${providerModel}${fallbackBadge}${usagePart}`;
+            body += `*Reviewed by ${providerLabel} ${providerModel}${fallbackBadge}${usagePart}${auditPart}`;
             body += isRound1 ? ` — Round 1 of 2*` : ` — Round 2 (Final); no further reviews will be performed*`;
 
             await github.rest.issues.createComment({
