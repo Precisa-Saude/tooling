@@ -5,6 +5,9 @@ import { basename, join } from 'node:path';
 
 export const DAY_MS = 86_400_000;
 
+/** Days without activity after which an unfinished branch is archived and removed. */
+export const DEFAULT_STALE_DAYS = 7;
+
 /** Large enough for `git status` of a busy worktree; the default is 1 MiB. */
 const MAX_BUFFER = 64 * 1024 * 1024;
 
@@ -75,8 +78,37 @@ export function branchActivity(
   } catch {
     // no reflog for this branch
   }
-  if (!worktree) return newest;
+  return worktree ? Math.max(newest, uncommittedActivity(worktree)) : newest;
+}
 
+/**
+ * Last activity in a detached worktree, in epoch ms: the newest of the HEAD
+ * commit's date, the worktree's own HEAD, index and reflog files (checkout,
+ * reset, status) and the mtime of each file with uncommitted changes. The HEAD
+ * commit alone would make a worktree just created on an old commit look idle.
+ */
+export function detachedActivity(worktree: string): number {
+  let newest = 0;
+  try {
+    newest =
+      Number(run('git', ['-C', worktree, 'log', '-1', '--format=%ct', 'HEAD']).trim()) * 1000;
+    const gitDir = run('git', ['-C', worktree, 'rev-parse', '--absolute-git-dir']).trim();
+    for (const f of ['HEAD', 'index', join('logs', 'HEAD')]) {
+      try {
+        newest = Math.max(newest, statSync(join(gitDir, f)).mtimeMs);
+      } catch {
+        // file absent
+      }
+    }
+  } catch {
+    // unreadable: rely on the files below
+  }
+  return Math.max(newest, uncommittedActivity(worktree));
+}
+
+/** Newest mtime among the files with uncommitted changes in `worktree`, or 0. */
+function uncommittedActivity(worktree: string): number {
+  let newest = 0;
   let status: string;
   try {
     status = run('git', ['-C', worktree, 'status', '--porcelain', '-z', '-uall']);
@@ -103,6 +135,8 @@ export interface ArchiveRequest {
   /** Runs git in the main checkout. */
   git: (args: string[]) => string;
   reason: string;
+  /** Start of the tag message. Defaults to `Branch <branch> arquivada`. */
+  subject?: string;
   tip: string;
   worktree?: string;
 }
@@ -140,7 +174,7 @@ export function archiveBranch(req: ArchiveRequest): ArchiveResult {
     req.git,
     tag,
     req.tip,
-    `Branch ${req.branch} arquivada pelo precisa-worktree prune em ${req.date} (${req.reason})`,
+    `${req.subject ?? `Branch ${req.branch} arquivada`} pelo precisa-worktree prune em ${req.date} (${req.reason})`,
   );
   const result: ArchiveResult = { tag };
   if (!req.worktree || !req.dirty) return result;
@@ -196,4 +230,13 @@ export function run(cmd: string, args: string[], cwd?: string): string {
     stdio: ['ignore', 'pipe', 'pipe'],
     ...(cwd ? { cwd } : {}),
   });
+}
+
+/** `git status --porcelain` of a worktree, or null when it can't be read. */
+export function readStatus(path: string): string | null {
+  try {
+    return run('git', ['-C', path, 'status', '--porcelain']);
+  } catch {
+    return null;
+  }
 }

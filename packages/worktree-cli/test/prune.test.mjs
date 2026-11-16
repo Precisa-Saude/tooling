@@ -11,6 +11,7 @@ import { describe, it } from 'node:test';
 import {
   archiveDate,
   classifyBranch,
+  classifyDetached,
   DEFAULT_STALE_DAYS,
   idleDays,
   deleteRemoteBranchViaApi,
@@ -169,36 +170,49 @@ describe('classifyBranch', () => {
     assert.equal(d.archive, false);
   });
 
-  it('keeps a recent merged branch whose local tip moved, then archives it once stale', () => {
-    const recent = classifyBranch(idle(3, { tip: 'b'.repeat(40) }));
+  it('removes a merged branch whose local tip is behind the PR head, without archive', () => {
+    const d = classifyBranch(idle(0, { tip: 'b'.repeat(40), tipInPrHead: true, worktree: '/wt' }));
+    assert.equal(d.action, 'remove');
+    assert.equal(d.archive, false);
+    assert.equal(d.reason, 'PR #1 MERGED, local tip behind the PR head');
+  });
+
+  it('keeps a merged branch with commits past the PR head for a day, then archives it', () => {
+    const recent = classifyBranch(idle(1, { tip: 'b'.repeat(40) }));
     assert.equal(recent.action, 'keep');
     assert.match(
       recent.reason,
-      /local tip is not the PR head; idle 3d, archived and removed after 7d idle/,
+      /local tip has commits not in the PR head; idle 1d, archived and removed after 1d idle/,
     );
-    const stale = classifyBranch(idle(10, { tip: 'b'.repeat(40) }));
+    const stale = classifyBranch(idle(2, { tip: 'b'.repeat(40) }));
     assert.equal(stale.action, 'remove');
     assert.equal(stale.archive, true);
     assert.equal(stale.dirty, false);
-    assert.match(stale.reason, /local tip is not the PR head, idle 10d/);
+    assert.match(stale.reason, /local tip has commits not in the PR head, idle 2d/);
   });
 
-  it('keeps a recent dirty worktree of a merged or closed PR, then archives it once stale', () => {
-    for (const state of ['MERGED', 'CLOSED']) {
-      const over = {
-        includeClosed: true,
-        pr: pr({ state }),
-        readStatus: () => ' M a.txt\n',
-        worktree: '/wt',
-      };
-      const recent = classifyBranch(idle(1, over));
+  it('a dirty worktree of a merged PR waits a day, of a closed PR staleDays', () => {
+    const over = { includeClosed: true, readStatus: () => ' M a.txt\n', worktree: '/wt' };
+    const merged = { ...over, pr: pr() };
+    const behind = { ...merged, tip: 'b'.repeat(40), tipInPrHead: true };
+    for (const input of [merged, behind]) {
+      const recent = classifyBranch(idle(1, input));
       assert.equal(recent.action, 'keep');
-      assert.match(recent.reason, /uncommitted changes; idle 1d/);
-      const stale = classifyBranch(idle(8, over));
+      assert.match(recent.reason, /uncommitted changes; idle 1d, archived and removed after 1d/);
+      const stale = classifyBranch(idle(2, input));
       assert.equal(stale.action, 'remove');
       assert.equal(stale.archive, true);
       assert.equal(stale.dirty, true);
     }
+    const closed = { ...over, pr: pr({ state: 'CLOSED' }) };
+    assert.match(classifyBranch(idle(2, closed)).reason, /after 7d idle/);
+    assert.equal(classifyBranch(idle(8, closed)).archive, true);
+  });
+
+  it('the merged grace never exceeds staleDays', () => {
+    const d = classifyBranch(idle(0.5, { staleDays: 0, tip: 'b'.repeat(40) }));
+    assert.equal(d.action, 'remove');
+    assert.equal(d.archive, true);
   });
 
   it('closed PRs: removed now with includeClosed, archived once stale without it', () => {
@@ -223,6 +237,33 @@ describe('classifyBranch', () => {
     );
     assert.equal(classifyBranch(idle(2, { pr: undefined, staleDays: 1 })).action, 'remove');
     assert.equal(classifyBranch(idle(20, { pr: undefined, staleDays: 30 })).action, 'ignore');
+  });
+});
+
+describe('classifyDetached', () => {
+  const detached = (days, over = {}) => ({
+    lastActivity: NOW - days * DAY,
+    now: NOW,
+    path: '/repo-detached',
+    readStatus: () => '',
+    ...over,
+  });
+
+  it('ignores a recent detached worktree and says when it will go', () => {
+    const d = classifyDetached(detached(2));
+    assert.equal(d.action, 'ignore');
+    assert.equal(d.reason, 'idle 2d, archived and removed after 7d idle');
+  });
+
+  it('archives and removes a detached worktree idle longer than staleDays', () => {
+    const d = classifyDetached(detached(8, { readStatus: () => '?? a.txt\n' }));
+    assert.deepEqual(d, { action: 'remove', dirty: true, reason: 'idle 8d' });
+    assert.equal(classifyDetached(detached(2, { staleDays: 1 })).action, 'remove');
+  });
+
+  it('keeps the current worktree and one whose status cannot be read', () => {
+    assert.equal(classifyDetached(detached(30, { cwdWorktree: '/repo-detached' })).action, 'keep');
+    assert.equal(classifyDetached(detached(30, { readStatus: () => null })).action, 'keep');
   });
 });
 

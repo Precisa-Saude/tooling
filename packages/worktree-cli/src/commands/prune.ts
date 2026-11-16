@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { type WorktreeConfig } from '../config.js';
 import { findRepoRoot } from '../paths.js';
 import { getBranchEntry, readRegistry } from '../registry.js';
+import { pruneDetached } from './prune-detached.js';
 import {
   deleteRemoteBranchViaApi,
   fetchPullRequests,
@@ -18,14 +19,18 @@ import {
   type ArchiveResult,
   archiveTag,
   branchActivity,
+  DEFAULT_STALE_DAYS,
   defaultArchiveDir,
   describeArchive,
   idleDays,
   isStale,
+  readStatus,
   run,
 } from './prune-stale.js';
 import { releaseBranchResources, stopServices } from './teardown.js';
 
+export type { ClassifyDetachedInput, DetachedDecision } from './prune-detached.js';
+export { classifyDetached } from './prune-detached.js';
 export type { PullRequest, RepoPullRequests } from './prune-github.js';
 export {
   deleteRemoteBranchViaApi,
@@ -34,9 +39,14 @@ export {
   lookupPullRequests,
   PR_LIST_LIMIT,
 } from './prune-github.js';
+export { DEFAULT_STALE_DAYS } from './prune-stale.js';
 
-/** Days without activity after which an unfinished branch is archived and removed. */
-export const DEFAULT_STALE_DAYS = 7;
+/**
+ * Idle days before a merged PR's branch with commits past the PR head, or with
+ * a dirty worktree, is archived and removed. Short because the PR is done;
+ * the day covers an agent that just committed the next fix on top of it.
+ */
+export const MERGED_GRACE_DAYS = 1;
 
 /** Branches without a PR under these prefixes are parked: never removed. */
 export const DEFAULT_KEEP_PREFIXES = ['park/'];
@@ -126,6 +136,8 @@ export interface ClassifyInput {
   readStatus: (path: string) => string | null;
   staleDays?: number;
   tip: string;
+  /** The tip is an ancestor of the PR head, so the branch holds nothing the PR lacks. */
+  tipInPrHead?: boolean;
   worktree?: string;
 }
 
@@ -157,16 +169,22 @@ export function classifyBranch(input: ClassifyInput): BranchDecision {
   const label = pr ? `PR #${pr.number} ${pr.state}` : 'no PR';
   if (pr && pr.state !== 'MERGED' && pr.state !== 'CLOSED') return keep(label);
 
+  const behind = tip !== pr?.headRefOid && input.tipInPrHead === true;
   let problem: string;
   if (!pr) problem = label;
   else if (pr.state === 'CLOSED' && !input.includeClosed) {
     problem = `${label}: pass --include-closed to remove`;
-  } else if (tip !== pr.headRefOid) problem = `${label}, but the local tip is not the PR head`;
-  else if (dirty) problem = `${label}, but ${worktree} has uncommitted changes`;
-  else return { action: 'remove', archive: false, branch, dirty, pr, reason: label, tip, ...at };
+  } else if (tip !== pr.headRefOid && !behind) {
+    problem = `${label}, but the local tip has commits not in the PR head`;
+  } else if (dirty) problem = `${label}, but ${worktree} has uncommitted changes`;
+  else {
+    const reason = behind ? `${label}, local tip behind the PR head` : label;
+    return { action: 'remove', archive: false, branch, dirty, pr, reason, tip, ...at };
+  }
 
+  const waitDays = pr?.state === 'MERGED' ? Math.min(staleDays, MERGED_GRACE_DAYS) : staleDays;
   const idle = idleDays(now, input.lastActivity);
-  if (isStale(now, input.lastActivity, staleDays)) {
+  if (isStale(now, input.lastActivity, waitDays)) {
     const reason = `${problem}, idle ${idle}d`;
     return {
       action: 'remove',
@@ -179,7 +197,7 @@ export function classifyBranch(input: ClassifyInput): BranchDecision {
       ...at,
     };
   }
-  const pending = `${problem}; idle ${idle}d, archived and removed after ${staleDays}d idle`;
+  const pending = `${problem}; idle ${idle}d, archived and removed after ${waitDays}d idle`;
   return pr ? keep(pending) : ignore(pending);
 }
 
@@ -284,6 +302,9 @@ export async function prune(opts: PruneOptions): Promise<PruneResult> {
       readStatus,
       staleDays,
       tip,
+      ...(pr?.state === 'MERGED' && tip !== pr.headRefOid
+        ? { tipInPrHead: isAncestor(git, tip, pr.headRefOid) }
+        : {}),
       ...(pr ? { pr } : {}),
       ...(worktree ? { worktree } : {}),
     });
@@ -360,6 +381,11 @@ export async function prune(opts: PruneOptions): Promise<PruneResult> {
     result.removed++;
   }
 
+  for (const wt of worktrees.slice(1)) {
+    if (wt.branch || wt.prunable) continue;
+    pruneDetached({ apply, archiveDir, cwdWorktree, date, git, now, out, result, staleDays, wt });
+  }
+
   if (cfg && existsSync(cfg.portRegistry)) {
     const live = new Set<string>();
     for (const wt of worktrees) if (wt.branch && !wt.prunable) live.add(wt.branch);
@@ -400,6 +426,20 @@ export async function prune(opts: PruneOptions): Promise<PruneResult> {
   return result;
 }
 
+/** `ancestor` is reachable from `descendant`; false when either is missing locally. */
+function isAncestor(
+  git: (args: string[]) => string,
+  ancestor: string,
+  descendant: string,
+): boolean {
+  try {
+    git(['merge-base', '--is-ancestor', ancestor, descendant]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 interface RegistryGcContext {
   apply: boolean;
   cfg: WorktreeConfig;
@@ -434,13 +474,5 @@ async function collectRegistryGarbage(ctx: RegistryGcContext): Promise<void> {
     await releaseBranchResources(cfg, branch);
     out(`${pad('freed')}slot ${entry.slot} of ${branch} (worktree gone)`);
     result.freed++;
-  }
-}
-
-function readStatus(path: string): string | null {
-  try {
-    return run('git', ['-C', path, 'status', '--porcelain']);
-  } catch {
-    return null;
   }
 }

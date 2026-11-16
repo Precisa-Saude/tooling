@@ -627,14 +627,34 @@ platform, 58 in lattes-editor). Close that gap without being asked:
   script, dry run first (`scripts/prune-merged-branches.sh` in
   platform, `scripts/limpar-branches-mesclados.sh` in lattes-editor),
   then apply.
-- `precisa-worktree prune` archives and removes anything idle longer
-  than `staleDays` (7 by default), except open PRs, the current
-  worktree and `park/*` branches. Archiving means a tag
-  `archive/<date>/<branch>` at the tip plus a patch of uncommitted work
-  under `~/.local/share/precisa-worktree/archive/`, so nothing is lost.
-  To keep a branch without a PR, name it `park/...`.
+- `precisa-worktree prune` removes a merged PR's branch right away when
+  its local tip is the PR head or behind it. A merged branch with commits
+  past the PR head, or with uncommitted changes, is archived and removed
+  after one idle day. Everything else (closed PRs, branches without a PR,
+  detached worktrees) goes after `staleDays` idle (7 by default). Open
+  PRs, the current worktree and `park/*` branches always stay. Archiving
+  means a tag `archive/<date>/<branch>` at the tip plus a patch of
+  uncommitted work under `~/.local/share/precisa-worktree/archive/`, so
+  nothing is lost. To keep a branch without a PR, name it `park/...`.
+- Read the whole prune output, not only the `removed` lines. A `kept` or
+  `FAILED` line says why something stayed; filtering with
+  `grep removed` is how leftovers went unnoticed for days.
 - If the command is denied, give the user the exact command to run
   rather than skipping the cleanup.
+
+**Don't create leftovers in the first place.** Each of these leaves a
+local branch whose tip matches no PR head, which prune can only archive
+after a wait:
+
+- Start every follow-up fix in a new worktree from `origin/main`
+  (`precisa-worktree setup <new-branch>`). Don't commit the next fix on
+  top of a branch whose PR already merged, and don't `git switch -c`
+  inside an old worktree.
+- Push to a PR only from that PR's own branch. Pushing from another
+  branch or a detached worktree (`git push origin HEAD:<pr-branch>`)
+  leaves the PR's local branch behind and the other one without a PR.
+- Remove a temporary `git worktree add --detach` checkout as soon as the
+  check it was made for is done.
 
 ## Plan persistence
 
