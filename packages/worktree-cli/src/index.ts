@@ -1,6 +1,8 @@
 export type {
   BranchDecision,
+  ClassifyDetachedInput,
   ClassifyInput,
+  DetachedDecision,
   PruneOptions,
   PruneResult,
   PullRequest,
@@ -9,10 +11,12 @@ export type {
 } from './commands/prune.js';
 export {
   classifyBranch,
+  classifyDetached,
   DEFAULT_KEEP_PREFIXES,
   DEFAULT_STALE_DAYS,
   deleteRemoteBranchViaApi,
   latestPullRequests,
+  MERGED_GRACE_DAYS,
   parseWorktreeList,
   PR_LIST_LIMIT,
   prune,

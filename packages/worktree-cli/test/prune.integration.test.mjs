@@ -130,7 +130,10 @@ describe('prune (local branches)', () => {
       assert.match(lineFor(dry.text, 'kept', 'feat/open'), /OPEN/);
       assert.match(lineFor(dry.text, 'kept', 'feat/closed'), /--include-closed/);
       assert.match(lineFor(dry.text, 'ignored', 'feat/nopr'), /no PR/);
-      assert.match(lineFor(dry.text, 'kept', 'feat/moved'), /local tip is not the PR head/);
+      assert.match(
+        lineFor(dry.text, 'kept', 'feat/moved'),
+        /local tip has commits not in the PR head/,
+      );
       assert.match(lineFor(dry.text, 'kept', 'feat/dirty'), /uncommitted changes/);
       assert.match(lineFor(dry.text, 'kept', 'keep/me'), /protected/);
       assert.match(lineFor(dry.text, 'kept', 'feat/reused'), /OPEN/);
@@ -378,7 +381,7 @@ describe('prune (stale branches)', () => {
       );
       assert.match(
         lineFor(dry.text, 'would remove', 'feat/moved'),
-        /local tip is not the PR head, idle \d+d.*archives as archive\//,
+        /local tip has commits not in the PR head, idle \d+d.*archives as archive\//,
       );
       assert.match(lineFor(dry.text, 'ignored', 'park/idea'), /parked under park\//);
       assert.match(lineFor(dry.text, 'kept', 'feat/open'), /OPEN/);
@@ -453,6 +456,112 @@ describe('prune (stale branches)', () => {
       assert.ok(existsSync(join(path, 'wip.txt')), 'worktree and its work kept');
       assert.ok(localBranches(root).includes('feat/stuck'));
       assert.deepEqual(tags(root), []);
+    } finally {
+      rmSync(repo.base, { force: true, recursive: true });
+    }
+  });
+});
+
+describe('prune (merged PR whose head differs from the local tip)', () => {
+  it('removes a tip behind the PR head now, archives one past it after a day', async () => {
+    const repo = makeRepo();
+    try {
+      const { root } = repo;
+      const archiveDir = join(repo.base, 'archive');
+      const prs = [];
+
+      // Someone pushed to the PR from another clone; this branch never pulled.
+      const behindTip = branch(root, 'feat/behind');
+      const behindWt = worktree(repo, 'feat/behind');
+      prs.push(
+        pr('feat/behind', git(root, 'commit-tree', 'HEAD^{tree}', '-p', behindTip, '-m', 'x')),
+      );
+
+      // The next fix committed on top of the merged branch.
+      const aheadHead = branch(root, 'feat/ahead');
+      prs.push(pr('feat/ahead', aheadHead));
+      const aheadTip = branch(root, 'feat/ahead', aheadHead);
+      const aheadWt = worktree(repo, 'feat/ahead');
+
+      // PR head commit never fetched here: can't prove it is behind.
+      branch(root, 'feat/unknown-head');
+      prs.push(pr('feat/unknown-head', 'f'.repeat(40)));
+
+      const opts = { archiveDir, pullRequests: { pullRequests: prs } };
+      const now = await run(repo, { ...opts, apply: true });
+      assert.equal(now.result.failed, 0);
+      assert.match(
+        lineFor(now.text, 'removed', 'feat/behind'),
+        /local tip behind the PR head, tip [0-9a-f]{7}\) and /,
+      );
+      assert.ok(!existsSync(behindWt), 'worktree removed');
+      assert.match(
+        lineFor(now.text, 'kept', 'feat/ahead'),
+        /commits not in the PR head; idle 0d, archived and removed after 1d idle/,
+      );
+      assert.match(lineFor(now.text, 'kept', 'feat/unknown-head'), /commits not in the PR head/);
+      assert.deepEqual(tags(root), [], 'nothing archived yet');
+
+      const later = Date.now() + 2 * DAY;
+      const date = archiveDate(later);
+      const applied = await run(repo, { ...opts, apply: true, now: later });
+      assert.equal(applied.result.failed, 0);
+      assert.match(
+        lineFor(applied.text, 'removed', 'feat/ahead'),
+        new RegExp(`archived as archive/${date}/feat/ahead`),
+      );
+      assert.ok(!existsSync(aheadWt), 'worktree removed');
+      assert.deepEqual(localBranches(root), ['main']);
+      assert.equal(git(root, 'rev-parse', `archive/${date}/feat/ahead^{commit}`), aheadTip);
+    } finally {
+      rmSync(repo.base, { force: true, recursive: true });
+    }
+  });
+});
+
+describe('prune (detached worktrees)', () => {
+  it('archives and removes a detached worktree once stale, never the current one', async () => {
+    const repo = makeRepo();
+    try {
+      const { root } = repo;
+      const archiveDir = join(repo.base, 'archive');
+      const date = archiveDate(LATER);
+      const path = join(repo.base, 'wt-check');
+      git(root, 'worktree', 'add', '-q', '--detach', path, 'main');
+      writeFileSync(join(path, 'README'), 'fixture\nchanged\n');
+      writeFileSync(join(path, 'result.txt'), 'benchmark\n');
+      const current = join(repo.base, 'wt-current');
+      git(root, 'worktree', 'add', '-q', '--detach', current, 'main');
+
+      const opts = { archiveDir, pullRequests: { pullRequests: [] } };
+      const recent = await run(repo, { ...opts, apply: true });
+      assert.match(
+        lineFor(recent.text, 'ignored', path),
+        /^ignored\s+detached .*wt-check \(HEAD [0-9a-f]{7}, idle 0d, archived and removed after 7d idle\)/,
+      );
+      assert.ok(existsSync(path));
+
+      const dry = await run(repo, { ...opts, cwdWorktree: current, now: LATER });
+      assert.match(
+        lineFor(dry.text, 'would remove', path),
+        new RegExp(`archives as archive/${date}/detached/wt-check plus the uncommitted changes`),
+      );
+      assert.match(lineFor(dry.text, 'kept', current), /current worktree/);
+      assert.ok(existsSync(path), 'dry run removes nothing');
+
+      const applied = await run(repo, { ...opts, apply: true, cwdWorktree: current, now: LATER });
+      assert.equal(applied.result.failed, 0);
+      assert.ok(!existsSync(path), 'detached worktree removed');
+      assert.ok(existsSync(current), 'current worktree kept');
+      assert.deepEqual(tags(root), [`archive/${date}/detached/wt-check`]);
+      const patch = join(archiveDir, date, 'detached__wt-check.patch');
+      const untracked = join(archiveDir, date, 'detached__wt-check.untracked.tgz');
+      assert.match(readFileSync(patch, 'utf-8'), /\+changed/);
+      assert.ok(existsSync(untracked));
+      assert.match(
+        git(root, 'tag', '-l', '--format=%(contents)', `archive/${date}/detached/wt-check`),
+        /Worktree destacado .*wt-check arquivado/,
+      );
     } finally {
       rmSync(repo.base, { force: true, recursive: true });
     }

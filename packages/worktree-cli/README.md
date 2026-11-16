@@ -132,8 +132,10 @@ Sem `--yes` nada muda. A saída tem uma linha por branch local:
 would remove fix/exemplo (PR #12 MERGED, tip 4fe632a) and /src/example-fix-exemplo
 would remove feat/velha (no PR, idle 40d, tip 1d231f6); archives as archive/2026-11-11/feat/velha
 kept         feat/em-andamento (PR #14 OPEN)
-kept         feat/outra (PR #11 MERGED, but the local tip is not the PR head; idle 3d, archived and removed after 7d idle)
+would remove fix/atrasada (PR #13 MERGED, local tip behind the PR head, tip 9a4c3f2)
+kept         feat/outra (PR #11 MERGED, but the local tip has commits not in the PR head; idle 0d, archived and removed after 1d idle)
 ignored      park/ideia (no PR, parked under park/)
+ignored      detached /src/example-conferencia (HEAD a3961e3, idle 2d, archived and removed after 7d idle)
 would free   slot 2 of feat/apagada (worktree gone)
 ```
 
@@ -156,13 +158,22 @@ aberto.
 Sai na hora, sem arquivamento, a branch cujo PR está `MERGED` (ou `CLOSED`, com
 `--include-closed`), cuja ponta local é o `headRefOid` do PR e cujo worktree,
 se houver, não tem alterações. Nada se perde, porque a ponta está no GitHub.
+Com PR mesclado, vale o mesmo para a ponta local que é ancestral do
+`headRefOid` (alguém fez push no PR de outro clone e esta branch não recebeu
+o pull): a branch não tem nada que o PR não tenha.
+
+PR mesclado com a ponta local à frente do `headRefOid` (o próximo commit foi
+feito em cima da branch já mesclada) ou com alterações não commitadas no
+worktree espera um dia de inatividade (`MERGED_GRACE_DAYS`, ou `staleDays` se
+for menor) e então é arquivado e removido. O dia existe para não tirar o
+worktree de um agente que acabou de commitar a correção seguinte e ainda vai
+levá-la para uma branch nova. Quando o commit do `headRefOid` não está no clone
+local, não dá para provar que a ponta está atrás, e a branch segue esta regra.
 
 Os outros casos esperam `staleDays` dias de inatividade (7 por padrão) e então
 são arquivados e removidos:
 
-- PR mesclado, mas a ponta local não é o `headRefOid` (commit depois do merge,
-  ou squash merge seguido de mais trabalho);
-- PR mesclado ou fechado com alterações não commitadas no worktree;
+- PR fechado com alterações não commitadas no worktree;
 - PR fechado sem `--include-closed`;
 - branch sem PR.
 
@@ -175,6 +186,14 @@ Branch sem PR cujo nome começa com um prefixo de `prune.keepPrefixes`
 (`park/` por padrão) fica estacionada e nunca sai. Para guardar trabalho sem
 abrir PR, use `park/<nome>`. Com PR, a branch `park/...` segue as regras do PR.
 
+Worktree em HEAD destacado (`git worktree add --detach`, comum para conferir
+um commit ou rodar um benchmark) não tem branch nem PR. Ele aparece como
+`detached <caminho>` e é arquivado e removido depois de `staleDays` dias de
+inatividade, a não ser que seja o worktree atual. Inatividade, aqui, é o mais
+recente entre a data do commit do HEAD, o `mtime` dos arquivos `HEAD`, `index`
+e `logs/HEAD` do worktree no `.git` e o dos arquivos alterados; sem os arquivos
+do `.git`, um worktree criado agora num commit antigo pareceria parado.
+
 ### Arquivo
 
 Antes de remover uma branch parada, `prune --yes` cria a tag anotada
@@ -183,7 +202,9 @@ Antes de remover uma branch parada, `prune --yes` cria a tag anotada
 `<archiveDir>/<AAAA-MM-DD>/<branch com / trocado por __>.patch` e os arquivos
 não rastreados (fora do `.gitignore`) vão para um `.untracked.tgz` ao lado.
 `archiveDir` é `~/.local/share/precisa-worktree/archive/<nome do diretório do
-repositório>` por padrão. A linha `removed` mostra a tag e os caminhos.
+repositório>` por padrão. A linha `removed` mostra a tag e os caminhos. Para um
+worktree destacado, a tag é `archive/<AAAA-MM-DD>/detached/<nome do diretório>`
+no HEAD, e só o worktree sai.
 
 Só depois do arquivo o worktree sai, com `git worktree remove --force` (o
 único caso em que o comando usa `--force`), e a branch é apagada. Se o
