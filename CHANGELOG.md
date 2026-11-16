@@ -1,3 +1,9 @@
+## [3.5.1](https://github.com/Precisa-Saude/tooling/compare/v3.5.0...v3.5.1) (2026-11-16)
+
+### Bug Fixes
+
+* **worktree-cli:** prune remove branch atrás do PR mesclado e worktree destacado parado ([#76](https://github.com/Precisa-Saude/tooling/issues/76)) ([79fb80e](https://github.com/Precisa-Saude/tooling/commit/79fb80e3d5d4a4fbfd738fc5237a95e93378c29a))
+
 ## [3.5.0](https://github.com/Precisa-Saude/tooling/compare/v3.4.1...v3.5.0) (2026-11-12)
 
 ### Features
