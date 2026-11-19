@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 
 import { type WorktreeConfig } from '../config.js';
-import { findRepoRoot } from '../paths.js';
+import { findRepoRoot, parseWorktreeList } from '../paths.js';
 import { getBranchEntry, readRegistry } from '../registry.js';
 import { pruneDetached } from './prune-detached.js';
 import {
@@ -29,6 +29,8 @@ import {
 } from './prune-stale.js';
 import { releaseBranchResources, stopServices } from './teardown.js';
 
+export type { WorktreeEntry } from '../paths.js';
+export { parseWorktreeList } from '../paths.js';
 export type { ClassifyDetachedInput, DetachedDecision } from './prune-detached.js';
 export { classifyDetached } from './prune-detached.js';
 export type { PullRequest, RepoPullRequests } from './prune-github.js';
@@ -50,14 +52,6 @@ export const MERGED_GRACE_DAYS = 1;
 
 /** Branches without a PR under these prefixes are parked: never removed. */
 export const DEFAULT_KEEP_PREFIXES = ['park/'];
-
-export interface WorktreeEntry {
-  /** Short branch name, absent for a detached HEAD. */
-  branch?: string;
-  path: string;
-  /** The directory is gone; `git worktree prune` would drop the entry. */
-  prunable?: boolean;
-}
 
 export interface PruneOptions {
   /** Actually remove; otherwise only print what would happen. */
@@ -199,23 +193,6 @@ export function classifyBranch(input: ClassifyInput): BranchDecision {
   }
   const pending = `${problem}; idle ${idle}d, archived and removed after ${waitDays}d idle`;
   return pr ? keep(pending) : ignore(pending);
-}
-
-/** Parse `git worktree list --porcelain`. The first entry is the main checkout. */
-export function parseWorktreeList(porcelain: string): WorktreeEntry[] {
-  const entries: WorktreeEntry[] = [];
-  let current: WorktreeEntry | null = null;
-  for (const line of porcelain.split('\n')) {
-    if (line.startsWith('worktree ')) {
-      current = { path: line.slice('worktree '.length) };
-      entries.push(current);
-    } else if (current && line.startsWith('branch refs/heads/')) {
-      current.branch = line.slice('branch refs/heads/'.length);
-    } else if (current && (line === 'prunable' || line.startsWith('prunable '))) {
-      current.prunable = true;
-    }
-  }
-  return entries;
 }
 
 export async function prune(opts: PruneOptions): Promise<PruneResult> {

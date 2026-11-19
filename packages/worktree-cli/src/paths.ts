@@ -17,6 +17,31 @@ export function worktreePath(cfg: WorktreeConfig, repoRoot: string, branch: stri
   return resolve(parentDir, worktreeDirectoryName(cfg, branch));
 }
 
+export interface WorktreeEntry {
+  /** Short branch name, absent for a detached HEAD. */
+  branch?: string;
+  path: string;
+  /** The directory is gone; `git worktree prune` would drop the entry. */
+  prunable?: boolean;
+}
+
+/** Parse `git worktree list --porcelain`. The first entry is the main checkout. */
+export function parseWorktreeList(porcelain: string): WorktreeEntry[] {
+  const entries: WorktreeEntry[] = [];
+  let current: WorktreeEntry | null = null;
+  for (const line of porcelain.split('\n')) {
+    if (line.startsWith('worktree ')) {
+      current = { path: line.slice('worktree '.length) };
+      entries.push(current);
+    } else if (current && line.startsWith('branch refs/heads/')) {
+      current.branch = line.slice('branch refs/heads/'.length);
+    } else if (current && (line === 'prunable' || line.startsWith('prunable '))) {
+      current.prunable = true;
+    }
+  }
+  return entries;
+}
+
 export function logFile(svc: ServiceConfig, branch: string): string {
   return `/tmp/${svc.logPrefix}-${branchToSuffix(branch)}.log`;
 }

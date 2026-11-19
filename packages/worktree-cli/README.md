@@ -98,6 +98,11 @@ pnpm exec precisa-worktree prune
 serviços em primeiro plano; `--detach` usa arquivos de log, e `--force` encerra
 processos que ocupam as portas reservadas. `teardown` encerra serviços, remove o
 worktree e libera as portas. Use `--keep-branch` para preservar a branch local.
+O worktree da branch é localizado pelo `git worktree list`, então o `teardown`
+também remove worktrees criados com `git worktree add` fora do diretório
+`<directoryPrefix>-<branch>`, e limpa o registro de um worktree cujo diretório
+já foi apagado. Se o worktree tiver alterações não commitadas, o `teardown`
+recusa e não remove nada; faça commit ou descarte as alterações e rode de novo.
 `prune` remove em lote os worktrees e as branches de PRs já mesclados e
 arquiva e remove as branches paradas (veja abaixo).
 
