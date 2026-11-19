@@ -1,3 +1,9 @@
+## [3.5.2](https://github.com/Precisa-Saude/tooling/compare/v3.5.1...v3.5.2) (2026-11-19)
+
+### Bug Fixes
+
+* **worktree-cli:** teardown acha o worktree pelo git e recusa alterações não commitadas ([#77](https://github.com/Precisa-Saude/tooling/issues/77)) ([3c48a77](https://github.com/Precisa-Saude/tooling/commit/3c48a77b6147fa71e0aad536546be067ec8cdb66))
+
 ## [3.5.1](https://github.com/Precisa-Saude/tooling/compare/v3.5.0...v3.5.1) (2026-11-16)
 
 ### Bug Fixes
