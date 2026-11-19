@@ -29,6 +29,8 @@ export {
   parseStatusPaths,
 } from './commands/prune-stale.js';
 export { seedNodeModules, setup } from './commands/setup.js';
+export type { TeardownOptions } from './commands/teardown.js';
+export { teardown } from './commands/teardown.js';
 export type { PruneConfig, PruneSettings, ServiceConfig, WorktreeConfig } from './config.js';
 export { loadConfig, loadPruneConfig } from './config.js';
 export { buildInheritedAppend, parseEnvKeys } from './env-merge.js';

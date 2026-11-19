@@ -5,9 +5,10 @@ import { existsSync, rmSync } from 'node:fs';
 import chalk from 'chalk';
 
 import { type WorktreeConfig } from '../config.js';
-import { logFile, worktreePath } from '../paths.js';
+import { logFile, parseWorktreeList, type WorktreeEntry } from '../paths.js';
 import { isPortInUse, killPort } from '../ports.js';
 import { free, getBranchEntry, portFor } from '../registry.js';
+import { run } from './prune-stale.js';
 
 export interface TeardownOptions {
   branch: string;
@@ -23,13 +24,21 @@ export async function teardown({
   repoRoot,
 }: TeardownOptions): Promise<void> {
   const entry = await getBranchEntry(cfg, branch);
-  const wtPath = worktreePath(cfg, repoRoot, branch);
+  // O caminho vem do git e não da convenção `<prefixo>-<branch>`: worktrees
+  // criados com `git worktree add` podem estar em qualquer diretório.
+  const worktree = branchWorktree(repoRoot, branch);
+
+  // Verificado antes de qualquer efeito, porque o `--force` abaixo
+  // descartaria o trabalho não commitado.
+  if (worktree && !worktree.prunable) assertClean(worktree.path);
 
   if (entry) await stopServices(cfg, entry);
 
-  if (existsSync(wtPath)) {
-    console.log(chalk.bold(`Removing worktree: ${wtPath}`));
-    execFileSync('git', ['-C', repoRoot, 'worktree', 'remove', wtPath, '--force'], {
+  if (worktree) {
+    console.log(chalk.bold(`Removing worktree: ${worktree.path}`));
+    // Também remove o registro de um worktree cujo diretório já sumiu, que
+    // impediria o `git branch -D` logo abaixo.
+    execFileSync('git', ['-C', repoRoot, 'worktree', 'remove', worktree.path, '--force'], {
       stdio: 'inherit',
     });
   }
@@ -80,6 +89,22 @@ export async function releaseBranchResources(cfg: WorktreeConfig, branch: string
     const path = logFile(svc, branch);
     if (existsSync(path)) rmSync(path);
   }
+}
+
+/** Worktree vinculado com `branch` em checkout, fora o checkout principal. */
+function branchWorktree(repoRoot: string, branch: string): WorktreeEntry | undefined {
+  const porcelain = run('git', ['-C', repoRoot, 'worktree', 'list', '--porcelain']);
+  return parseWorktreeList(porcelain)
+    .slice(1)
+    .find((wt) => wt.branch === branch);
+}
+
+function assertClean(path: string): void {
+  if (run('git', ['-C', path, 'status', '--porcelain']).trim() === '') return;
+  throw new Error(
+    `Worktree ${path} has uncommitted changes; nothing was removed. ` +
+      'Commit or discard them, then run teardown again.',
+  );
 }
 
 function branchRefExists(repoRoot: string, branch: string): boolean {
