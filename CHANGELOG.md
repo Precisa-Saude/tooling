@@ -1,3 +1,9 @@
+## [3.5.3](https://github.com/Precisa-Saude/tooling/compare/v3.5.2...v3.5.3) (2026-11-20)
+
+### Bug Fixes
+
+* **worktree-cli:** aceita services vazio, --version real e prune mantém worktree com alterações ([#78](https://github.com/Precisa-Saude/tooling/issues/78)) ([e96d311](https://github.com/Precisa-Saude/tooling/commit/e96d3113644383fd1e1d2fced52de99fa2d452bb))
+
 ## [3.5.2](https://github.com/Precisa-Saude/tooling/compare/v3.5.1...v3.5.2) (2026-11-19)
 
 ### Bug Fixes
