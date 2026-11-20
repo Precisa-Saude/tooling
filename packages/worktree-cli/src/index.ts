@@ -22,12 +22,7 @@ export {
   prune,
 } from './commands/prune.js';
 export type { ArchiveResult } from './commands/prune-stale.js';
-export {
-  archiveDate,
-  defaultArchiveDir,
-  idleDays,
-  parseStatusPaths,
-} from './commands/prune-stale.js';
+export { archiveDate, idleDays, parseStatusPaths } from './commands/prune-stale.js';
 export { seedNodeModules, setup } from './commands/setup.js';
 export type { TeardownOptions } from './commands/teardown.js';
 export { teardown } from './commands/teardown.js';

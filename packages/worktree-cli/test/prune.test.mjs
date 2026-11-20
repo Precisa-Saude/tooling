@@ -187,26 +187,36 @@ describe('classifyBranch', () => {
     const stale = classifyBranch(idle(2, { tip: 'b'.repeat(40) }));
     assert.equal(stale.action, 'remove');
     assert.equal(stale.archive, true);
-    assert.equal(stale.dirty, false);
     assert.match(stale.reason, /local tip has commits not in the PR head, idle 2d/);
   });
 
-  it('a dirty worktree of a merged PR waits a day, of a closed PR staleDays', () => {
-    const over = { includeClosed: true, readStatus: () => ' M a.txt\n', worktree: '/wt' };
-    const merged = { ...over, pr: pr() };
-    const behind = { ...merged, tip: 'b'.repeat(40), tipInPrHead: true };
-    for (const input of [merged, behind]) {
-      const recent = classifyBranch(idle(1, input));
-      assert.equal(recent.action, 'keep');
-      assert.match(recent.reason, /uncommitted changes; idle 1d, archived and removed after 1d/);
-      const stale = classifyBranch(idle(2, input));
-      assert.equal(stale.action, 'remove');
-      assert.equal(stale.archive, true);
-      assert.equal(stale.dirty, true);
+  it('keeps a worktree with uncommitted changes, whatever the PR and however idle', () => {
+    const dirty = { readStatus: () => '?? slide-11.txt\n', worktree: '/wt' };
+    for (const over of [
+      {},
+      { tip: 'b'.repeat(40), tipInPrHead: true },
+      { tip: 'b'.repeat(40) },
+      { pr: pr({ state: 'CLOSED' }) },
+      { includeClosed: true, pr: pr({ state: 'CLOSED' }) },
+      { pr: undefined },
+    ]) {
+      const d = classifyBranch(idle(365, { ...dirty, ...over }));
+      assert.equal(d.action, 'keep', JSON.stringify(over));
+      assert.equal(d.uncommitted, true);
+      assert.match(
+        d.reason,
+        /, but \/wt has uncommitted changes: commit or discard them, then run prune again$/,
+      );
     }
-    const closed = { ...over, pr: pr({ state: 'CLOSED' }) };
-    assert.match(classifyBranch(idle(2, closed)).reason, /after 7d idle/);
-    assert.equal(classifyBranch(idle(8, closed)).archive, true);
+    // Open PRs and parked branches keep their own reason.
+    assert.equal(
+      classifyBranch(idle(1, { ...dirty, pr: pr({ state: 'OPEN' }) })).uncommitted,
+      undefined,
+    );
+    assert.equal(
+      classifyBranch(idle(1, { ...dirty, branch: 'park/x', pr: undefined })).action,
+      'ignore',
+    );
   });
 
   it('the merged grace never exceeds staleDays', () => {
@@ -255,10 +265,21 @@ describe('classifyDetached', () => {
     assert.equal(d.reason, 'idle 2d, archived and removed after 7d idle');
   });
 
-  it('archives and removes a detached worktree idle longer than staleDays', () => {
-    const d = classifyDetached(detached(8, { readStatus: () => '?? a.txt\n' }));
-    assert.deepEqual(d, { action: 'remove', dirty: true, reason: 'idle 8d' });
+  it('archives and removes a clean detached worktree idle longer than staleDays', () => {
+    const d = classifyDetached(detached(8));
+    assert.deepEqual(d, { action: 'remove', reason: 'idle 8d' });
     assert.equal(classifyDetached(detached(2, { staleDays: 1 })).action, 'remove');
+  });
+
+  it('keeps a detached worktree with uncommitted changes, however idle', () => {
+    for (const status of ['?? a.txt\n', ' M README\n']) {
+      const d = classifyDetached(detached(365, { readStatus: () => status }));
+      assert.deepEqual(d, {
+        action: 'keep',
+        reason: 'uncommitted changes: commit or discard them, then run prune again',
+        uncommitted: true,
+      });
+    }
   });
 
   it('keeps the current worktree and one whose status cannot be read', () => {
@@ -342,12 +363,11 @@ describe('loadPruneConfig', () => {
       },
     ));
 
-  it('reads staleDays, keepPrefixes and archiveDir', () =>
+  it('reads staleDays and keepPrefixes, and ignores the retired archiveDir', () =>
     withPkg(
       '{"worktree":{"prune":{"staleDays":14,"keepPrefixes":["park/","spike/"],"archiveDir":"/tmp/a"}}}',
       async (dir) => {
         assert.deepEqual(await loadPruneConfig(dir), {
-          archiveDir: '/tmp/a',
           cfg: null,
           keepPrefixes: ['park/', 'spike/'],
           protectedBranches: [],
@@ -356,12 +376,11 @@ describe('loadPruneConfig', () => {
       },
     ));
 
-  it('rejects invalid staleDays, keepPrefixes and archiveDir', async () => {
+  it('rejects invalid staleDays and keepPrefixes', async () => {
     for (const [prune, message] of [
       [{ staleDays: -1 }, /staleDays/],
       [{ staleDays: '7' }, /staleDays/],
       [{ keepPrefixes: 'park/' }, /keepPrefixes/],
-      [{ archiveDir: '' }, /archiveDir/],
     ]) {
       await withPkg(JSON.stringify({ worktree: { prune } }), async (dir) => {
         await assert.rejects(loadPruneConfig(dir), message);

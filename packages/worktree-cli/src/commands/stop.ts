@@ -1,6 +1,7 @@
+/* eslint-disable no-console -- CLI de stop: imprime progresso no console de propósito */
 import chalk from 'chalk';
 
-import { type WorktreeConfig } from '../config.js';
+import { hasServices, noServicesMessage, type WorktreeConfig } from '../config.js';
 import { isPortInUse, killPort } from '../ports.js';
 import { getBranchEntry, portFor } from '../registry.js';
 
@@ -10,6 +11,11 @@ export interface StopOptions {
 }
 
 export async function stop({ branch, cfg }: StopOptions): Promise<void> {
+  if (!hasServices(cfg)) {
+    console.log(noServicesMessage(cfg, 'stop'));
+    return;
+  }
+
   const entry = await getBranchEntry(cfg, branch);
   if (!entry) {
     console.error(`No ports registered for '${branch}'.`);

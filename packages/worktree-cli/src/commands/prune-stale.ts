@@ -1,7 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { closeSync, mkdirSync, openSync, rmSync, statSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { basename, join } from 'node:path';
+import { statSync } from 'node:fs';
+import { join } from 'node:path';
 
 export const DAY_MS = 86_400_000;
 
@@ -16,11 +15,6 @@ export function archiveDate(now: number): string {
   const d = new Date(now);
   const two = (n: number): string => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
-}
-
-/** `~/.local/share/precisa-worktree/archive/<repo dir basename>`. */
-export function defaultArchiveDir(mainRoot: string): string {
-  return join(homedir(), '.local', 'share', 'precisa-worktree', 'archive', basename(mainRoot));
 }
 
 /** Whole days between `lastActivity` and `now`, never negative. */
@@ -126,27 +120,19 @@ function uncommittedActivity(worktree: string): number {
 }
 
 export interface ArchiveRequest {
-  archiveDir: string;
   branch: string;
   /** `YYYY-MM-DD`, from `archiveDate`. */
   date: string;
-  /** Whether the worktree has uncommitted changes to save. */
-  dirty: boolean;
   /** Runs git in the main checkout. */
   git: (args: string[]) => string;
   reason: string;
   /** Start of the tag message. Defaults to `Branch <branch> arquivada`. */
   subject?: string;
   tip: string;
-  worktree?: string;
 }
 
 export interface ArchiveResult {
-  /** `git diff HEAD --binary` of the worktree, when not empty. */
-  patch?: string;
   tag: string;
-  /** Untracked files that are not ignored, as a gzipped tarball. */
-  untracked?: string;
 }
 
 export function archiveTag(date: string, branch: string): string {
@@ -164,9 +150,10 @@ export function tagArchive(
 }
 
 /**
- * Save what removing the branch would lose: an annotated tag at the tip and,
- * for a dirty worktree, a patch of tracked changes plus a tarball of the
- * untracked files. Throws on any failure; the caller then deletes nothing.
+ * Save what removing the branch would lose: an annotated tag at the tip. Only
+ * clean worktrees get here (prune keeps any worktree with uncommitted
+ * changes), so the tip is everything. Throws on failure; the caller then
+ * deletes nothing.
  */
 export function archiveBranch(req: ArchiveRequest): ArchiveResult {
   const tag = archiveTag(req.date, req.branch);
@@ -176,51 +163,12 @@ export function archiveBranch(req: ArchiveRequest): ArchiveResult {
     req.tip,
     `${req.subject ?? `Branch ${req.branch} arquivada`} pelo precisa-worktree prune em ${req.date} (${req.reason})`,
   );
-  const result: ArchiveResult = { tag };
-  if (!req.worktree || !req.dirty) return result;
-
-  const dir = join(req.archiveDir, req.date);
-  mkdirSync(dir, { recursive: true });
-  const base = join(dir, req.branch.replace(/\//g, '__'));
-
-  const patch = `${base}.patch`;
-  const fd = openSync(patch, 'w');
-  try {
-    execFileSync('git', ['-C', req.worktree, 'diff', 'HEAD', '--binary'], {
-      stdio: ['ignore', fd, 'pipe'],
-    });
-  } finally {
-    closeSync(fd);
-  }
-  if (statSync(patch).size > 0) result.patch = patch;
-  else rmSync(patch);
-
-  const others = run('git', [
-    '-C',
-    req.worktree,
-    'ls-files',
-    '--others',
-    '--exclude-standard',
-    '-z',
-  ]);
-  if (others) {
-    const tarball = `${base}.untracked.tgz`;
-    execFileSync('tar', ['-czf', tarball, '-C', req.worktree, '--null', '-T', '-'], {
-      input: others,
-      stdio: ['pipe', 'ignore', 'pipe'],
-    });
-    result.untracked = tarball;
-  }
-  return result;
+  return { tag };
 }
 
-/** Human-readable list of what `archiveBranch` produced. */
+/** Human-readable summary of what `archiveBranch` produced. */
 export function describeArchive(a: ArchiveResult): string {
-  return [
-    `archived as ${a.tag}`,
-    ...(a.patch ? [`patch ${a.patch}`] : []),
-    ...(a.untracked ? [`untracked ${a.untracked}`] : []),
-  ].join(', ');
+  return `archived as ${a.tag}`;
 }
 
 export function run(cmd: string, args: string[], cwd?: string): string {
@@ -239,4 +187,16 @@ export function readStatus(path: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** How a `kept` line for a worktree with uncommitted changes ends, as teardown's error does. */
+export const COMMIT_OR_DISCARD = 'commit or discard them, then run prune again';
+
+/**
+ * Whether `git status --porcelain` output lists a tracked change or an
+ * untracked file. Ignored files (`node_modules`, `dist`) don't count. Shared by
+ * `teardown` and `prune`, which both refuse to remove such a worktree.
+ */
+export function hasUncommittedChanges(status: string): boolean {
+  return status.trim() !== '';
 }

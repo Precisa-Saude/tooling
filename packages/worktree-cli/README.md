@@ -80,9 +80,36 @@ preservados. Se usado, mantenha esses arquivos ignorados pelo Git e limite a
 herança às configurações necessárias ao desenvolvimento. Credenciais e detalhes
 da infraestrutura pertencem aos mecanismos privados do repositório consumidor.
 
+## Repositório sem servidor de desenvolvimento
+
+Uma biblioteca sem servidor local declara `"services": []`:
+
+```json
+{
+  "worktree": {
+    "directoryPrefix": "example-lib",
+    "portRegistry": "/tmp/example-lib-worktree-ports.json",
+    "buildCommand": "pnpm turbo run build --filter=./packages/*",
+    "services": []
+  }
+}
+```
+
+Nesse caso `setup` cria o worktree, instala as dependências e roda o
+`buildCommand`, mas não reserva porta nenhuma: o registro de portas não é lido
+nem criado, e `portRegistry` continua obrigatório só para manter um formato
+único de configuração. `dev`, `stop` e `logs` avisam que não há servidor para
+rodar e saem com código 0. `list` mostra os worktrees de `git worktree list`
+com a branch e o caminho, já que não há portas a listar. `teardown` e `prune`
+funcionam como em qualquer outro repositório.
+
+Sem o campo `worktree`, `prune` funciona e os outros comandos param com um erro
+que pede a configuração.
+
 ## Comandos
 
 ```bash
+pnpm exec precisa-worktree --version
 pnpm exec precisa-worktree setup feat/my-work
 pnpm exec precisa-worktree dev --detach
 pnpm exec precisa-worktree dev --force
@@ -104,7 +131,8 @@ também remove worktrees criados com `git worktree add` fora do diretório
 já foi apagado. Se o worktree tiver alterações não commitadas, o `teardown`
 recusa e não remove nada; faça commit ou descarte as alterações e rode de novo.
 `prune` remove em lote os worktrees e as branches de PRs já mesclados e
-arquiva e remove as branches paradas (veja abaixo).
+arquiva e remove as branches paradas (veja abaixo). `--version` imprime a
+versão do pacote instalado, lida do `package.json` dele em tempo de execução.
 
 Comandos com argumento de branch detectam o worktree atual quando executados
 em um worktree vinculado. No checkout principal, informe a branch.
@@ -131,7 +159,8 @@ pnpm exec precisa-worktree prune --remote          # inclui branches remotas
 pnpm exec precisa-worktree prune --stale-days 14   # outro prazo de inatividade
 ```
 
-Sem `--yes` nada muda. A saída tem uma linha por branch local:
+Sem `--yes` nada muda. A saída tem uma linha por branch local, e os worktrees
+com alterações não commitadas aparecem num bloco à parte, no fim:
 
 ```text
 would remove fix/exemplo (PR #12 MERGED, tip 4fe632a) and /src/example-fix-exemplo
@@ -142,6 +171,12 @@ kept         feat/outra (PR #11 MERGED, but the local tip has commits not in the
 ignored      park/ideia (no PR, parked under park/)
 ignored      detached /src/example-conferencia (HEAD a3961e3, idle 2d, archived and removed after 7d idle)
 would free   slot 2 of feat/apagada (worktree gone)
+
+Worktrees with uncommitted changes, never removed by prune:
+kept         feat/slide (PR #15 MERGED, but /src/example-feat-slide has uncommitted changes: commit or discard them, then run prune again)
+kept         detached /src/example-bench (HEAD 7c1e2d0, uncommitted changes: commit or discard them, then run prune again)
+
+3 would be removed, 1 slots would be freed, 6 kept (2 with uncommitted changes). Run with --yes to apply.
 ```
 
 O comando funciona em qualquer repositório Git, com ou sem o campo `worktree`
@@ -160,32 +195,37 @@ principal, as listadas em `prune.protected`, o worktree de onde o comando foi
 chamado, worktrees cujo `git status` não pode ser lido e branches com PR
 aberto.
 
+Também fica sempre, com ou sem `--yes`, qualquer worktree com alterações não
+commitadas: arquivo rastreado modificado ou arquivo novo fora do `.gitignore`,
+a mesma verificação (`git status --porcelain`) que faz o `teardown` recusar.
+Vale para o worktree de PR mesclado ou fechado, de branch sem PR parada há
+muito tempo e para o worktree em HEAD destacado, por mais tempo que estejam
+parados. A branch em checkout nele também fica. Essas linhas saem como `kept`
+no bloco do fim, com o caminho, e não contam como falha: o comando termina com
+código 0. Para liberar o worktree, faça commit ou descarte as alterações e rode
+`prune` de novo.
+
 Sai na hora, sem arquivamento, a branch cujo PR está `MERGED` (ou `CLOSED`, com
-`--include-closed`), cuja ponta local é o `headRefOid` do PR e cujo worktree,
-se houver, não tem alterações. Nada se perde, porque a ponta está no GitHub.
+`--include-closed`) e cuja ponta local é o `headRefOid` do PR. Nada se perde,
+porque a ponta está no GitHub.
 Com PR mesclado, vale o mesmo para a ponta local que é ancestral do
 `headRefOid` (alguém fez push no PR de outro clone e esta branch não recebeu
 o pull): a branch não tem nada que o PR não tenha.
 
 PR mesclado com a ponta local à frente do `headRefOid` (o próximo commit foi
-feito em cima da branch já mesclada) ou com alterações não commitadas no
-worktree espera um dia de inatividade (`MERGED_GRACE_DAYS`, ou `staleDays` se
-for menor) e então é arquivado e removido. O dia existe para não tirar o
+feito em cima da branch já mesclada) espera um dia de inatividade
+(`MERGED_GRACE_DAYS`, ou `staleDays` se for menor) e então é arquivado e
+removido. O dia existe para não tirar o
 worktree de um agente que acabou de commitar a correção seguinte e ainda vai
 levá-la para uma branch nova. Quando o commit do `headRefOid` não está no clone
 local, não dá para provar que a ponta está atrás, e a branch segue esta regra.
 
 Os outros casos esperam `staleDays` dias de inatividade (7 por padrão) e então
-são arquivados e removidos:
-
-- PR fechado com alterações não commitadas no worktree;
-- PR fechado sem `--include-closed`;
-- branch sem PR.
+são arquivados e removidos: PR fechado sem `--include-closed` e branch sem PR.
 
 Enquanto o prazo não vence, a linha diz há quantos dias a branch está parada.
-Inatividade é o mais recente entre a data do commit da ponta, a última entrada
-do reflog da branch (criação, reset, pull) e o `mtime` dos arquivos que
-aparecem no `git status` do worktree.
+Inatividade é o mais recente entre a data do commit da ponta e a última entrada
+do reflog da branch (criação, reset, pull).
 
 Branch sem PR cujo nome começa com um prefixo de `prune.keepPrefixes`
 (`park/` por padrão) fica estacionada e nunca sai. Para guardar trabalho sem
@@ -194,34 +234,29 @@ abrir PR, use `park/<nome>`. Com PR, a branch `park/...` segue as regras do PR.
 Worktree em HEAD destacado (`git worktree add --detach`, comum para conferir
 um commit ou rodar um benchmark) não tem branch nem PR. Ele aparece como
 `detached <caminho>` e é arquivado e removido depois de `staleDays` dias de
-inatividade, a não ser que seja o worktree atual. Inatividade, aqui, é o mais
-recente entre a data do commit do HEAD, o `mtime` dos arquivos `HEAD`, `index`
-e `logs/HEAD` do worktree no `.git` e o dos arquivos alterados; sem os arquivos
-do `.git`, um worktree criado agora num commit antigo pareceria parado.
+inatividade, a não ser que seja o worktree atual ou tenha alterações não
+commitadas. Inatividade, aqui, é o mais recente entre a data do commit do HEAD
+e o `mtime` dos arquivos `HEAD`, `index` e `logs/HEAD` do worktree no `.git`;
+sem esses arquivos, um worktree criado agora num commit antigo pareceria
+parado.
 
 ### Arquivo
 
 Antes de remover uma branch parada, `prune --yes` cria a tag anotada
-`archive/<AAAA-MM-DD>/<branch>` na ponta. Se o worktree tem alterações, o
-`git diff HEAD --binary` vai para
-`<archiveDir>/<AAAA-MM-DD>/<branch com / trocado por __>.patch` e os arquivos
-não rastreados (fora do `.gitignore`) vão para um `.untracked.tgz` ao lado.
-`archiveDir` é `~/.local/share/precisa-worktree/archive/<nome do diretório do
-repositório>` por padrão. A linha `removed` mostra a tag e os caminhos. Para um
-worktree destacado, a tag é `archive/<AAAA-MM-DD>/detached/<nome do diretório>`
-no HEAD, e só o worktree sai.
+`archive/<AAAA-MM-DD>/<branch>` na ponta, e a linha `removed` mostra a tag.
+Como worktree com alterações não commitadas nunca sai, a ponta é tudo o que a
+branch tem. Para um worktree destacado, a tag é
+`archive/<AAAA-MM-DD>/detached/<nome do diretório>` no HEAD, e só o worktree
+sai.
 
-Só depois do arquivo o worktree sai, com `git worktree remove --force` (o
-único caso em que o comando usa `--force`), e a branch é apagada. Se o
-arquivamento falhar, por exemplo porque a assinatura da tag falhou com
-`tag.gpgSign` ligado, a linha `FAILED` aparece e nada é apagado.
+Só depois da tag o worktree sai e a branch é apagada. Se o arquivamento falhar,
+por exemplo porque a assinatura da tag falhou com `tag.gpgSign` ligado, a linha
+`FAILED` aparece e nada é apagado.
 
 Para recuperar uma branch arquivada:
 
 ```bash
 git checkout -b feat/velha archive/2026-11-11/feat/velha
-git apply ~/.local/share/precisa-worktree/archive/<repo>/2026-11-11/feat__velha.patch
-tar -xzf ~/.local/share/precisa-worktree/archive/<repo>/2026-11-11/feat__velha.untracked.tgz
 ```
 
 As tags ficam só no clone local. Para apagar o arquivo antigo, use
@@ -229,8 +264,10 @@ As tags ficam só no clone local. Para apagar o arquivo antigo, use
 
 ### Remoção
 
-A remoção começa pelo worktree. Se ele não sair, a branch fica e a linha
-`FAILED` diz qual passo falhou. Quando o repositório tem configuração de
+A remoção começa pelo worktree, com `git worktree remove` sem `--force`: se
+alguém alterou o worktree depois da verificação, o git recusa, a branch fica e
+a linha `FAILED` diz qual passo falhou. Arquivos ignorados, como
+`node_modules`, não impedem a remoção. Quando o repositório tem configuração de
 serviços e a branch está no registro de portas, o comando também encerra os
 servidores, libera as portas e apaga os logs, como o `teardown`. Cada remoção
 imprime a ponta curta, para recriar a branch com `git branch <nome> <sha>` se
@@ -263,14 +300,14 @@ isso:
     "prune": {
       "protected": ["test/fixture-permanente"],
       "staleDays": 7,
-      "keepPrefixes": ["park/"],
-      "archiveDir": "/caminho/para/arquivo"
+      "keepPrefixes": ["park/"]
     }
   }
 }
 ```
 
-`--stale-days` na linha de comando tem precedência sobre `staleDays`.
+`--stale-days` na linha de comando tem precedência sobre `staleDays`. O antigo
+`archiveDir` não é mais usado e, se estiver no `package.json`, é ignorado.
 
 ## Reserva de portas
 
