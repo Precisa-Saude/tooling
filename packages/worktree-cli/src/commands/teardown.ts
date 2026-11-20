@@ -4,11 +4,11 @@ import { existsSync, rmSync } from 'node:fs';
 
 import chalk from 'chalk';
 
-import { type WorktreeConfig } from '../config.js';
+import { hasServices, type WorktreeConfig } from '../config.js';
 import { logFile, parseWorktreeList, type WorktreeEntry } from '../paths.js';
 import { isPortInUse, killPort } from '../ports.js';
 import { free, getBranchEntry, portFor } from '../registry.js';
-import { run } from './prune-stale.js';
+import { hasUncommittedChanges, run } from './prune-stale.js';
 
 export interface TeardownOptions {
   branch: string;
@@ -23,7 +23,8 @@ export async function teardown({
   keepBranch = false,
   repoRoot,
 }: TeardownOptions): Promise<void> {
-  const entry = await getBranchEntry(cfg, branch);
+  // Sem serviços não há portas: o registro não é lido nem criado.
+  const entry = hasServices(cfg) ? await getBranchEntry(cfg, branch) : null;
   // O caminho vem do git e não da convenção `<prefixo>-<branch>`: worktrees
   // criados com `git worktree add` podem estar em qualquer diretório.
   const worktree = branchWorktree(repoRoot, branch);
@@ -62,7 +63,7 @@ export async function teardown({
     }
   }
 
-  await releaseBranchResources(cfg, branch);
+  if (hasServices(cfg)) await releaseBranchResources(cfg, branch);
 
   console.log(chalk.green(`Teardown complete for '${branch}'.`));
 }
@@ -100,7 +101,7 @@ function branchWorktree(repoRoot: string, branch: string): WorktreeEntry | undef
 }
 
 function assertClean(path: string): void {
-  if (run('git', ['-C', path, 'status', '--porcelain']).trim() === '') return;
+  if (!hasUncommittedChanges(run('git', ['-C', path, 'status', '--porcelain']))) return;
   throw new Error(
     `Worktree ${path} has uncommitted changes; nothing was removed. ` +
       'Commit or discard them, then run teardown again.',

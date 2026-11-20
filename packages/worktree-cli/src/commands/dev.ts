@@ -1,9 +1,16 @@
+/* eslint-disable no-console -- CLI de dev: imprime as portas e o estado dos servidores no console de propósito */
 import { spawn } from 'node:child_process';
 import { createWriteStream, existsSync } from 'node:fs';
 
 import chalk from 'chalk';
 
-import { devArgs, type ServiceConfig, type WorktreeConfig } from '../config.js';
+import {
+  devArgs,
+  hasServices,
+  noServicesMessage,
+  type ServiceConfig,
+  type WorktreeConfig,
+} from '../config.js';
 import { logFile, worktreePath } from '../paths.js';
 import { isPortInUse, killPort } from '../ports.js';
 import { getBranchEntry, portFor } from '../registry.js';
@@ -25,6 +32,11 @@ export async function dev({
   force = false,
   repoRoot,
 }: DevOptions): Promise<void> {
+  if (!hasServices(cfg)) {
+    console.log(noServicesMessage(cfg, 'run'));
+    return;
+  }
+
   const entry = await getBranchEntry(cfg, branch);
   if (!entry) {
     console.error(chalk.red(`No ports allocated for '${branch}'. Run setup first.`));

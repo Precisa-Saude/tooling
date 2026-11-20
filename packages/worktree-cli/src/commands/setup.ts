@@ -5,7 +5,7 @@ import { dirname, resolve } from 'node:path';
 
 import chalk from 'chalk';
 
-import { type WorktreeConfig } from '../config.js';
+import { hasServices, type WorktreeConfig } from '../config.js';
 import { buildInheritedAppend } from '../env-merge.js';
 import { logFile, worktreePath } from '../paths.js';
 import { allocate } from '../registry.js';
@@ -39,7 +39,8 @@ export async function setup({ branch, cfg, repoRoot }: SetupOptions): Promise<vo
     : ['-C', repoRoot, 'worktree', 'add', '-b', branch, wtPath, 'origin/main'];
   execFileSync('git', addArgs, { stdio: 'inherit' });
 
-  const entry = await allocate(cfg, branch);
+  // No services, no ports to reserve: the registry is neither read nor created.
+  const ports = hasServices(cfg) ? (await allocate(cfg, branch)).ports : {};
 
   if (cfg.install !== false) {
     const seeded = seedNodeModules(repoRoot, wtPath);
@@ -70,7 +71,7 @@ export async function setup({ branch, cfg, repoRoot }: SetupOptions): Promise<vo
     console.log(chalk.bold('==> Writing worktree-scoped files'));
     for (const { contents, path } of cfg.writeFiles) {
       let interpolated = contents;
-      for (const [svcName, port] of Object.entries(entry.ports)) {
+      for (const [svcName, port] of Object.entries(ports)) {
         interpolated = interpolated
           .replaceAll(`{${svcName}_port}`, String(port))
           .replaceAll('{port}', String(port));
@@ -119,8 +120,14 @@ export async function setup({ branch, cfg, repoRoot }: SetupOptions): Promise<vo
   console.log('');
   console.log(chalk.green(`Worktree ready: ${wtPath}`));
   console.log(`  Branch: ${branch}`);
+  if (!hasServices(cfg)) {
+    console.log('  No ports reserved: no dev servers (worktree.services is empty).');
+    console.log('');
+    console.log(`  cd ${wtPath}`);
+    return;
+  }
   for (const svc of cfg.services) {
-    const port = entry.ports[svc.name]!;
+    const port = ports[svc.name]!;
     console.log(
       `  ${svc.name.padEnd(8)}: http://localhost:${port}  (logs: ${logFile(svc, branch)})`,
     );

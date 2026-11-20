@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* eslint-disable no-console -- ponto de entrada do CLI: erros vão para o console de propósito */
-import { rmdirSync } from 'node:fs';
+import { readFileSync, rmdirSync } from 'node:fs';
 
 import chalk from 'chalk';
 import { Command, InvalidArgumentError } from 'commander';
@@ -12,7 +12,14 @@ import { prune } from './commands/prune.js';
 import { setup } from './commands/setup.js';
 import { stop } from './commands/stop.js';
 import { teardown } from './commands/teardown.js';
-import { isDayCount, loadConfig, loadPruneConfig, lockDir, type WorktreeConfig } from './config.js';
+import {
+  hasServices,
+  isDayCount,
+  loadConfig,
+  loadPruneConfig,
+  lockDir,
+  type WorktreeConfig,
+} from './config.js';
 import { detectBranch, findRepoRoot, mainWorktreeRoot } from './paths.js';
 
 async function main(): Promise<void> {
@@ -20,7 +27,7 @@ async function main(): Promise<void> {
   program
     .name('precisa-worktree')
     .description('Git-worktree lifecycle CLI for Precisa Saúde repositories')
-    .version('1.0.4');
+    .version(packageVersion());
 
   program
     .command('setup <branch>')
@@ -103,7 +110,6 @@ async function main(): Promise<void> {
           mainRoot,
           protectedBranches: settings.protectedBranches,
           remote: opts.remote,
-          ...(settings.archiveDir ? { archiveDir: settings.archiveDir } : {}),
           ...(settings.keepPrefixes ? { keepPrefixes: settings.keepPrefixes } : {}),
           ...(staleDays !== undefined ? { staleDays } : {}),
         });
@@ -156,7 +162,8 @@ async function resolveContext(opts: ResolveOpts): Promise<{
     branch = detectBranch(cfg) ?? '';
   }
 
-  if (!branch && !opts.requireMain) {
+  // Without services, dev/stop/logs only say there is nothing to run: no branch needed.
+  if (!branch && !opts.requireMain && hasServices(cfg)) {
     console.error(
       chalk.red(
         "Couldn't detect branch. Run from inside a linked worktree or pass the branch name.",
@@ -166,6 +173,19 @@ async function resolveContext(opts: ResolveOpts): Promise<{
   }
 
   return { branch, cfg, mainRoot, wtRoot };
+}
+
+/**
+ * Read at run time from the package's own `package.json`, one level above
+ * `dist/bin.js` both in this repo and in the published tarball (npm always
+ * ships `package.json`). The release job bumps that file, so a version
+ * injected at build time could go stale; reading it here can't.
+ */
+function packageVersion(): string {
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf-8')) as {
+    version: string;
+  };
+  return pkg.version;
 }
 
 function parseDays(value: string): number {

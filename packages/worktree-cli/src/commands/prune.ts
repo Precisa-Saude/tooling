@@ -19,9 +19,10 @@ import {
   type ArchiveResult,
   archiveTag,
   branchActivity,
+  COMMIT_OR_DISCARD,
   DEFAULT_STALE_DAYS,
-  defaultArchiveDir,
   describeArchive,
+  hasUncommittedChanges,
   idleDays,
   isStale,
   readStatus,
@@ -44,9 +45,9 @@ export {
 export { DEFAULT_STALE_DAYS } from './prune-stale.js';
 
 /**
- * Idle days before a merged PR's branch with commits past the PR head, or with
- * a dirty worktree, is archived and removed. Short because the PR is done;
- * the day covers an agent that just committed the next fix on top of it.
+ * Idle days before a merged PR's branch with commits past the PR head is
+ * archived and removed. Short because the PR is done; the day covers an agent
+ * that just committed the next fix on top of it.
  */
 export const MERGED_GRACE_DAYS = 1;
 
@@ -56,8 +57,6 @@ export const DEFAULT_KEEP_PREFIXES = ['park/'];
 export interface PruneOptions {
   /** Actually remove; otherwise only print what would happen. */
   apply?: boolean;
-  /** Where patches of uncommitted work go. Defaults to `defaultArchiveDir(mainRoot)`. */
-  archiveDir?: string;
   /** Full worktree config when the repo has one; enables the teardown path. */
   cfg?: WorktreeConfig | null;
   /** Root of the worktree the command runs from. Defaults to `git rev-parse --show-toplevel`. */
@@ -94,17 +93,24 @@ export interface PruneResult {
   freed: number;
   kept: number;
   removed: number;
+  /** Worktrees kept because of uncommitted changes; also counted in `kept`. */
+  uncommitted: number;
 }
 
 export type BranchDecision =
   | { action: 'ignore'; branch: string; reason: string }
-  | { action: 'keep'; branch: string; reason: string }
+  | {
+      action: 'keep';
+      branch: string;
+      reason: string;
+      /** Kept only because its worktree has uncommitted changes. */
+      uncommitted?: true;
+    }
   | {
       action: 'remove';
-      /** Tag the tip (and save uncommitted work) before removing. */
+      /** Tag the tip before removing. */
       archive: boolean;
       branch: string;
-      dirty: boolean;
       pr?: PullRequest;
       reason: string;
       tip: string;
@@ -152,7 +158,7 @@ export function classifyBranch(input: ClassifyInput): BranchDecision {
   if (worktree) {
     const status = input.readStatus(worktree);
     if (status === null) return keep(`the status of ${worktree} can't be read`);
-    dirty = status.trim() !== '';
+    dirty = hasUncommittedChanges(status);
   }
   if (input.prUnknown) return keep('the PR lookup failed: run again');
 
@@ -162,6 +168,11 @@ export function classifyBranch(input: ClassifyInput): BranchDecision {
   }
   const label = pr ? `PR #${pr.number} ${pr.state}` : 'no PR';
   if (pr && pr.state !== 'MERGED' && pr.state !== 'CLOSED') return keep(label);
+  // Never removed nor archived, whatever the PR and however idle, like teardown.
+  if (dirty) {
+    const reason = `${label}, but ${worktree} has uncommitted changes: ${COMMIT_OR_DISCARD}`;
+    return { action: 'keep', branch, reason, uncommitted: true };
+  }
 
   const behind = tip !== pr?.headRefOid && input.tipInPrHead === true;
   let problem: string;
@@ -170,10 +181,9 @@ export function classifyBranch(input: ClassifyInput): BranchDecision {
     problem = `${label}: pass --include-closed to remove`;
   } else if (tip !== pr.headRefOid && !behind) {
     problem = `${label}, but the local tip has commits not in the PR head`;
-  } else if (dirty) problem = `${label}, but ${worktree} has uncommitted changes`;
-  else {
+  } else {
     const reason = behind ? `${label}, local tip behind the PR head` : label;
-    return { action: 'remove', archive: false, branch, dirty, pr, reason, tip, ...at };
+    return { action: 'remove', archive: false, branch, pr, reason, tip, ...at };
   }
 
   const waitDays = pr?.state === 'MERGED' ? Math.min(staleDays, MERGED_GRACE_DAYS) : staleDays;
@@ -184,7 +194,6 @@ export function classifyBranch(input: ClassifyInput): BranchDecision {
       action: 'remove',
       archive: true,
       branch,
-      dirty,
       ...(pr ? { pr } : {}),
       reason,
       tip,
@@ -205,7 +214,6 @@ export async function prune(opts: PruneOptions): Promise<PruneResult> {
   const now = opts.now ?? Date.now();
   const staleDays = opts.staleDays ?? DEFAULT_STALE_DAYS;
   const keepPrefixes = opts.keepPrefixes ?? DEFAULT_KEEP_PREFIXES;
-  const archiveDir = opts.archiveDir ?? defaultArchiveDir(mainRoot);
   const date = archiveDate(now);
   const git = (args: string[]): string => run('git', ['-C', mainRoot, ...args]);
 
@@ -252,7 +260,9 @@ export async function prune(opts: PruneOptions): Promise<PruneResult> {
   };
 
   const cwdWorktree = opts.cwdWorktree ?? findRepoRoot();
-  const result: PruneResult = { failed: 0, freed: 0, kept: 0, removed: 0 };
+  const result: PruneResult = { failed: 0, freed: 0, kept: 0, removed: 0, uncommitted: 0 };
+  /** `kept` lines of worktrees with uncommitted changes, printed apart. */
+  const uncommittedLines: string[] = [];
   /** Branches whose "would remove" line already reports the slot it frees. */
   const slotReported = new Set<string>();
 
@@ -287,7 +297,11 @@ export async function prune(opts: PruneOptions): Promise<PruneResult> {
     });
 
     if (decision.action !== 'remove') {
-      out(`${pad(decision.action === 'keep' ? 'kept' : 'ignored')}${branch} (${decision.reason})`);
+      const line = `${pad(decision.action === 'keep' ? 'kept' : 'ignored')}${branch} (${decision.reason})`;
+      if (decision.action === 'keep' && decision.uncommitted) {
+        uncommittedLines.push(line);
+        result.uncommitted++;
+      } else out(line);
       result.kept++;
       continue;
     }
@@ -299,11 +313,7 @@ export async function prune(opts: PruneOptions): Promise<PruneResult> {
     }${entry ? `, frees slot ${entry.slot}` : ''}`;
     if (!apply) {
       if (entry) slotReported.add(branch);
-      const archives = decision.archive
-        ? `; archives as ${archiveTag(date, branch)}${
-            decision.dirty ? ' plus the uncommitted changes' : ''
-          }`
-        : '';
+      const archives = decision.archive ? `; archives as ${archiveTag(date, branch)}` : '';
       out(`${pad('would remove')}${what}${archives}`);
       result.removed++;
       continue;
@@ -312,16 +322,7 @@ export async function prune(opts: PruneOptions): Promise<PruneResult> {
     let archived: ArchiveResult | null = null;
     if (decision.archive) {
       try {
-        archived = archiveBranch({
-          archiveDir,
-          branch,
-          date,
-          dirty: decision.dirty,
-          git,
-          reason: decision.reason,
-          tip,
-          ...(decision.worktree ? { worktree: decision.worktree } : {}),
-        });
+        archived = archiveBranch({ branch, date, git, reason: decision.reason, tip });
       } catch (e) {
         out(`${pad('FAILED')}${branch}: archiving failed, nothing was deleted (${firstLine(e)})`);
         result.failed++;
@@ -333,8 +334,8 @@ export async function prune(opts: PruneOptions): Promise<PruneResult> {
     if (cfg && entry) await stopServices(cfg, entry);
     if (decision.worktree) {
       try {
-        // --force only after the archive saved the uncommitted work.
-        git(['worktree', 'remove', ...(archived ? ['--force'] : []), decision.worktree]);
+        // No --force: git refuses a worktree that got changes after it was classified.
+        git(['worktree', 'remove', decision.worktree]);
       } catch (e) {
         out(
           `${pad('FAILED')}${branch}: worktree ${decision.worktree} was not removed, nothing was deleted (${firstLine(e)})${saved}`,
@@ -360,7 +361,18 @@ export async function prune(opts: PruneOptions): Promise<PruneResult> {
 
   for (const wt of worktrees.slice(1)) {
     if (wt.branch || wt.prunable) continue;
-    pruneDetached({ apply, archiveDir, cwdWorktree, date, git, now, out, result, staleDays, wt });
+    pruneDetached({
+      apply,
+      cwdWorktree,
+      date,
+      git,
+      now,
+      out,
+      result,
+      staleDays,
+      uncommittedLines,
+      wt,
+    });
   }
 
   if (cfg && existsSync(cfg.portRegistry)) {
@@ -389,15 +401,24 @@ export async function prune(opts: PruneOptions): Promise<PruneResult> {
     });
   }
 
+  if (uncommittedLines.length > 0) {
+    out('');
+    out('Worktrees with uncommitted changes, never removed by prune:');
+    for (const line of uncommittedLines) out(line);
+  }
+
   out('');
+  const kept = `${result.kept} kept${
+    result.uncommitted > 0 ? ` (${result.uncommitted} with uncommitted changes)` : ''
+  }`;
   if (apply) {
     git(['worktree', 'prune']);
     out(
-      `${result.removed} removed, ${result.freed} slots freed, ${result.kept} kept, ${result.failed} failed.`,
+      `${result.removed} removed, ${result.freed} slots freed, ${kept}, ${result.failed} failed.`,
     );
   } else {
     out(
-      `${result.removed} would be removed, ${result.freed} slots would be freed, ${result.kept} kept. Run with --yes to apply.`,
+      `${result.removed} would be removed, ${result.freed} slots would be freed, ${kept}. Run with --yes to apply.`,
     );
   }
   return result;

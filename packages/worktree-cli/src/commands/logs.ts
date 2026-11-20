@@ -1,9 +1,10 @@
+/* eslint-disable no-console -- CLI de logs: imprime avisos no console de propósito */
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
 import chalk from 'chalk';
 
-import { type WorktreeConfig } from '../config.js';
+import { hasServices, noServicesMessage, type WorktreeConfig } from '../config.js';
 import { logFile } from '../paths.js';
 
 export interface LogsOptions {
@@ -13,6 +14,11 @@ export interface LogsOptions {
 }
 
 export async function logs({ branch, cfg, service }: LogsOptions): Promise<void> {
+  if (!hasServices(cfg)) {
+    console.log(noServicesMessage(cfg, 'show'));
+    return;
+  }
+
   const svc = service ? cfg.services.find((s) => s.name === service) : cfg.services[0];
 
   if (!svc) {

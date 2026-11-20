@@ -33,7 +33,6 @@ export interface ServiceConfig {
 }
 
 export interface PruneSettings {
-  archiveDir?: string;
   keepPrefixes?: string[];
   protected?: string[];
   staleDays?: number;
@@ -89,15 +88,18 @@ export interface WorktreeConfig {
    * names that prune never removes, whatever the state of their PR.
    * `staleDays` (default 7) is how long an unfinished branch may sit idle
    * before prune archives and removes it. `keepPrefixes` (default
-   * `['park/']`) parks branches without a PR. `archiveDir` (default
-   * `~/.local/share/precisa-worktree/archive/<repo dir>`) receives the
-   * patches of uncommitted work. A repo may declare only this field (no
-   * `services`) to use prune without the port-allocation features.
+   * `['park/']`) parks branches without a PR. A repo may declare only this
+   * field (no `services`) to use prune without the port-allocation features.
    *
    * Example: `prune: { protected: ['test/fixture-worktree'], staleDays: 14 }`
    */
   prune?: PruneSettings;
-  /** Services managed by this repo. At least one required. */
+  /**
+   * Dev servers managed by this repo. `[]` declares a repo without any (a
+   * pure library): `setup` creates the worktree, installs and builds but
+   * reserves no ports and writes nothing to the registry, and `dev`, `stop`
+   * and `logs` report that there is nothing to run.
+   */
   services: ServiceConfig[];
   /**
    * Extra per-service file writes performed during `setup`, after
@@ -148,8 +150,8 @@ export async function loadConfig(repoRoot: string): Promise<WorktreeConfig> {
   if (!cfg.portRegistry) {
     throw new Error('worktree.portRegistry is required');
   }
-  if (!cfg.services?.length) {
-    throw new Error('worktree.services must contain at least one entry');
+  if (!Array.isArray(cfg.services)) {
+    throw new Error('worktree.services must be a list of dev servers ([] for a repo without any)');
   }
   for (const svc of cfg.services) {
     if (!svc.name) throw new Error('service.name is required');
@@ -167,8 +169,6 @@ export async function loadConfig(repoRoot: string): Promise<WorktreeConfig> {
 }
 
 export interface PruneConfig {
-  /** `worktree.prune.archiveDir`, when set. */
-  archiveDir?: string;
   /** Full worktree config, or null when the repo has no `worktree.services`. */
   cfg: WorktreeConfig | null;
   /** `worktree.prune.keepPrefixes`, when set. */
@@ -181,7 +181,7 @@ export interface PruneConfig {
 /**
  * Lenient loader for `prune`, which must work in any git repo: no
  * `package.json`, or no `worktree` field, yields `{ cfg: null }`. A
- * `worktree` field that declares `services` is validated like
+ * `worktree` field that declares `services`, even `[]`, is validated like
  * `loadConfig` does, so a broken config still surfaces as an error.
  */
 export async function loadPruneConfig(repoRoot: string): Promise<PruneConfig> {
@@ -211,22 +211,18 @@ export async function loadPruneConfig(repoRoot: string): Promise<PruneConfig> {
   if (!isStringArray(list)) {
     throw new Error('worktree.prune.protected must be an array of branch names');
   }
-  const { archiveDir, keepPrefixes, staleDays } = settings;
+  const { keepPrefixes, staleDays } = settings;
   if (keepPrefixes !== undefined && !isStringArray(keepPrefixes)) {
     throw new Error('worktree.prune.keepPrefixes must be an array of branch-name prefixes');
   }
   if (staleDays !== undefined && !isDayCount(staleDays)) {
     throw new Error('worktree.prune.staleDays must be a non-negative number of days');
   }
-  if (archiveDir !== undefined && (typeof archiveDir !== 'string' || archiveDir === '')) {
-    throw new Error('worktree.prune.archiveDir must be a path');
-  }
 
-  const cfg = wt.services ? await loadConfig(repoRoot) : null;
+  const cfg = wt.services !== undefined ? await loadConfig(repoRoot) : null;
   return {
     cfg,
     protectedBranches: list,
-    ...(archiveDir !== undefined ? { archiveDir } : {}),
     ...(keepPrefixes !== undefined ? { keepPrefixes } : {}),
     ...(staleDays !== undefined ? { staleDays } : {}),
   };
@@ -238,6 +234,16 @@ function isStringArray(value: unknown): value is string[] {
 
 export function isDayCount(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
+/** Whether the repo declares dev servers; `services: []` means none. */
+export function hasServices(cfg: WorktreeConfig): boolean {
+  return cfg.services.length > 0;
+}
+
+/** What `dev`, `stop` and `logs` print in a repo with `services: []`. */
+export function noServicesMessage(cfg: WorktreeConfig, nothingTo: string): string {
+  return `${cfg.directoryPrefix} has no dev servers (worktree.services is empty): nothing to ${nothingTo}.`;
 }
 
 export function lockDir(cfg: WorktreeConfig): string {

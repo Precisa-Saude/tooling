@@ -18,6 +18,7 @@ import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
 import { archiveDate, prune } from '../dist/index.js';
+import { cli, fakeGh } from './cli-fixtures.mjs';
 
 const DAY = 86_400_000;
 /** Far enough ahead that everything created by a test is stale. */
@@ -121,7 +122,7 @@ describe('prune (local branches)', () => {
 
       const dry = await run(repo, opts);
       assert.deepEqual(localBranches(root), before, 'dry run changes nothing');
-      assert.deepEqual(dry.result, { failed: 0, freed: 0, kept: 8, removed: 2 });
+      assert.deepEqual(dry.result, { failed: 0, freed: 0, kept: 8, removed: 2, uncommitted: 1 });
       assert.match(lineFor(dry.text, 'would remove', 'feat/merged-wt'), new RegExp(mergedWt));
       assert.match(
         lineFor(dry.text, 'would remove', 'feat/merged'),
@@ -141,7 +142,13 @@ describe('prune (local branches)', () => {
       assert.match(dry.text, /Run with --yes to apply/);
 
       const applied = await run(repo, { ...opts, apply: true });
-      assert.deepEqual(applied.result, { failed: 0, freed: 0, kept: 8, removed: 2 });
+      assert.deepEqual(applied.result, {
+        failed: 0,
+        freed: 0,
+        kept: 8,
+        removed: 2,
+        uncommitted: 1,
+      });
       assert.ok(!existsSync(mergedWt), 'worktree removed');
       assert.ok(lineFor(applied.text, 'removed', 'feat/merged-wt'));
       const after = localBranches(root);
@@ -345,18 +352,15 @@ describe('prune --remote', () => {
 const tags = (root) => git(root, 'tag', '--list', 'archive/*').split('\n').filter(Boolean).sort();
 
 describe('prune (stale branches)', () => {
-  it('archives a stale branch with a tag, a patch and the untracked files, then removes it', async () => {
+  it('archives a stale branch with a tag at its tip, then removes it and its clean worktree', async () => {
     const repo = makeRepo();
     try {
       const { root } = repo;
-      const archiveDir = join(repo.base, 'archive');
       const date = archiveDate(LATER);
       const prs = [];
 
       const noPrTip = branch(root, 'feat/nopr');
       const noPrWt = worktree(repo, 'feat/nopr');
-      writeFileSync(join(noPrWt, 'README'), 'fixture\nwork in progress\n');
-      writeFileSync(join(noPrWt, 'notes.txt'), 'untracked\n');
 
       const movedTip = branch(root, 'feat/moved');
       prs.push(pr('feat/moved', movedTip));
@@ -366,18 +370,15 @@ describe('prune (stale branches)', () => {
       prs.push(pr('feat/open', branch(root, 'feat/open'), 'OPEN'));
       branch(root, 'feat/recent');
 
-      const opts = { archiveDir, now: LATER, pullRequests: { pullRequests: prs } };
+      const opts = { now: LATER, pullRequests: { pullRequests: prs } };
       const before = localBranches(root);
 
       const dry = await run(repo, opts);
       assert.deepEqual(localBranches(root), before, 'dry run changes nothing');
       assert.deepEqual(tags(root), [], 'dry run creates no tag');
-      assert.ok(!existsSync(archiveDir), 'dry run writes no archive');
       assert.match(
         lineFor(dry.text, 'would remove', 'feat/nopr'),
-        new RegExp(
-          `no PR, idle \\d+d.*archives as archive/${date}/feat/nopr plus the uncommitted changes`,
-        ),
+        new RegExp(`no PR, idle \\d+d.*archives as archive/${date}/feat/nopr$`),
       );
       assert.match(
         lineFor(dry.text, 'would remove', 'feat/moved'),
@@ -394,13 +395,9 @@ describe('prune (stale branches)', () => {
 
       const applied = await run(repo, { ...opts, apply: true });
       assert.equal(applied.result.failed, 0);
-      const patch = join(archiveDir, date, 'feat__nopr.patch');
-      const untracked = join(archiveDir, date, 'feat__nopr.untracked.tgz');
       const removedLine = lineFor(applied.text, 'removed', 'feat/nopr');
-      assert.match(removedLine, new RegExp(`archived as archive/${date}/feat/nopr`));
-      assert.ok(removedLine.includes(`patch ${patch}`));
-      assert.ok(removedLine.includes(`untracked ${untracked}`));
-      assert.ok(!existsSync(noPrWt), 'dirty worktree removed');
+      assert.match(removedLine, new RegExp(`archived as archive/${date}/feat/nopr$`));
+      assert.ok(!existsSync(noPrWt), 'clean worktree removed');
 
       const after = localBranches(root);
       for (const b of ['feat/nopr', 'feat/moved', 'feat/recent']) assert.ok(!after.includes(b));
@@ -418,14 +415,10 @@ describe('prune (stale branches)', () => {
         git(root, 'tag', '-l', '--format=%(contents)', `archive/${date}/feat/nopr`),
         /arquivada/,
       );
-      assert.ok(!existsSync(join(archiveDir, date, 'feat__moved.patch')), 'no patch when clean');
 
       // Restore as the README says.
-      git(root, 'worktree', 'add', '-q', '-b', 'feat/nopr', noPrWt, `archive/${date}/feat/nopr`);
-      git(noPrWt, 'apply', patch);
-      execFileSync('tar', ['-xzf', untracked, '-C', noPrWt]);
-      assert.equal(readFileSync(join(noPrWt, 'README'), 'utf-8'), 'fixture\nwork in progress\n');
-      assert.equal(readFileSync(join(noPrWt, 'notes.txt'), 'utf-8'), 'untracked\n');
+      git(root, 'branch', 'feat/nopr', `archive/${date}/feat/nopr`);
+      assert.equal(git(root, 'rev-parse', 'feat/nopr'), noPrTip);
     } finally {
       rmSync(repo.base, { force: true, recursive: true });
     }
@@ -435,10 +428,8 @@ describe('prune (stale branches)', () => {
     const repo = makeRepo();
     try {
       const { root } = repo;
-      const archiveDir = join(repo.base, 'archive');
       branch(root, 'feat/stuck');
       const path = worktree(repo, 'feat/stuck');
-      writeFileSync(join(path, 'wip.txt'), 'wip\n');
       // A signing failure, as when tag.gpgSign is on and gpg can't sign.
       git(root, 'config', 'tag.gpgSign', 'true');
       git(root, 'config', 'gpg.format', 'openpgp');
@@ -446,14 +437,13 @@ describe('prune (stale branches)', () => {
 
       const { result, text } = await run(repo, {
         apply: true,
-        archiveDir,
         now: LATER,
         pullRequests: { pullRequests: [] },
       });
       assert.equal(result.failed, 1);
       assert.equal(result.removed, 0);
       assert.match(lineFor(text, 'FAILED', 'feat/stuck'), /archiving failed, nothing was deleted/);
-      assert.ok(existsSync(join(path, 'wip.txt')), 'worktree and its work kept');
+      assert.ok(existsSync(path), 'worktree kept');
       assert.ok(localBranches(root).includes('feat/stuck'));
       assert.deepEqual(tags(root), []);
     } finally {
@@ -467,7 +457,6 @@ describe('prune (merged PR whose head differs from the local tip)', () => {
     const repo = makeRepo();
     try {
       const { root } = repo;
-      const archiveDir = join(repo.base, 'archive');
       const prs = [];
 
       // Someone pushed to the PR from another clone; this branch never pulled.
@@ -487,7 +476,7 @@ describe('prune (merged PR whose head differs from the local tip)', () => {
       branch(root, 'feat/unknown-head');
       prs.push(pr('feat/unknown-head', 'f'.repeat(40)));
 
-      const opts = { archiveDir, pullRequests: { pullRequests: prs } };
+      const opts = { pullRequests: { pullRequests: prs } };
       const now = await run(repo, { ...opts, apply: true });
       assert.equal(now.result.failed, 0);
       assert.match(
@@ -520,20 +509,17 @@ describe('prune (merged PR whose head differs from the local tip)', () => {
 });
 
 describe('prune (detached worktrees)', () => {
-  it('archives and removes a detached worktree once stale, never the current one', async () => {
+  it('archives and removes a clean detached worktree once stale, never the current one', async () => {
     const repo = makeRepo();
     try {
       const { root } = repo;
-      const archiveDir = join(repo.base, 'archive');
       const date = archiveDate(LATER);
       const path = join(repo.base, 'wt-check');
       git(root, 'worktree', 'add', '-q', '--detach', path, 'main');
-      writeFileSync(join(path, 'README'), 'fixture\nchanged\n');
-      writeFileSync(join(path, 'result.txt'), 'benchmark\n');
       const current = join(repo.base, 'wt-current');
       git(root, 'worktree', 'add', '-q', '--detach', current, 'main');
 
-      const opts = { archiveDir, pullRequests: { pullRequests: [] } };
+      const opts = { pullRequests: { pullRequests: [] } };
       const recent = await run(repo, { ...opts, apply: true });
       assert.match(
         lineFor(recent.text, 'ignored', path),
@@ -544,7 +530,7 @@ describe('prune (detached worktrees)', () => {
       const dry = await run(repo, { ...opts, cwdWorktree: current, now: LATER });
       assert.match(
         lineFor(dry.text, 'would remove', path),
-        new RegExp(`archives as archive/${date}/detached/wt-check plus the uncommitted changes`),
+        new RegExp(`archives as archive/${date}/detached/wt-check$`),
       );
       assert.match(lineFor(dry.text, 'kept', current), /current worktree/);
       assert.ok(existsSync(path), 'dry run removes nothing');
@@ -554,14 +540,48 @@ describe('prune (detached worktrees)', () => {
       assert.ok(!existsSync(path), 'detached worktree removed');
       assert.ok(existsSync(current), 'current worktree kept');
       assert.deepEqual(tags(root), [`archive/${date}/detached/wt-check`]);
-      const patch = join(archiveDir, date, 'detached__wt-check.patch');
-      const untracked = join(archiveDir, date, 'detached__wt-check.untracked.tgz');
-      assert.match(readFileSync(patch, 'utf-8'), /\+changed/);
-      assert.ok(existsSync(untracked));
       assert.match(
         git(root, 'tag', '-l', '--format=%(contents)', `archive/${date}/detached/wt-check`),
         /Worktree destacado .*wt-check arquivado/,
       );
+    } finally {
+      rmSync(repo.base, { force: true, recursive: true });
+    }
+  });
+});
+
+describe('prune (detached worktrees that cannot go)', () => {
+  it('reports FAILED and keeps the worktree when archiving or removing fails', async () => {
+    const repo = makeRepo();
+    try {
+      const { base, root } = repo;
+      const locked = join(base, 'wt-locked');
+      git(root, 'worktree', 'add', '-q', '--detach', locked, 'main');
+      git(root, 'worktree', 'lock', locked);
+      const opts = { apply: true, now: LATER, pullRequests: { pullRequests: [] } };
+
+      const removal = await run(repo, opts);
+      assert.equal(removal.result.failed, 1);
+      assert.match(
+        lineFor(removal.text, 'FAILED', locked),
+        /: not removed \(.*archived as archive\//,
+      );
+      assert.ok(existsSync(locked));
+      git(root, 'worktree', 'unlock', locked);
+
+      // A signing failure, as when tag.gpgSign is on and gpg can't sign.
+      git(root, 'tag', '-d', `archive/${archiveDate(LATER)}/detached/wt-locked`);
+      git(root, 'config', 'tag.gpgSign', 'true');
+      git(root, 'config', 'gpg.format', 'openpgp');
+      git(root, 'config', 'gpg.program', 'false');
+      const archiving = await run(repo, opts);
+      assert.equal(archiving.result.failed, 1);
+      assert.match(
+        lineFor(archiving.text, 'FAILED', locked),
+        /archiving failed, nothing was deleted/,
+      );
+      assert.ok(existsSync(locked));
+      assert.deepEqual(tags(root), []);
     } finally {
       rmSync(repo.base, { force: true, recursive: true });
     }
@@ -742,6 +762,129 @@ describe('prune --remote (stale)', () => {
         git(root, 'rev-parse', `archive/${date}/origin__feat/r-moved^{commit}`),
         remoteTip,
       );
+    } finally {
+      rmSync(repo.base, { force: true, recursive: true });
+    }
+  });
+});
+
+describe('prune (worktrees with uncommitted changes)', () => {
+  /**
+   * Three dirty worktrees (merged PR, stale branch without PR, detached), each
+   * with a clean counterpart. `node_modules/` is ignored, as in a real
+   * worktree, and must not count as a change.
+   */
+  function dirtyAndClean() {
+    const repo = makeRepo();
+    const { base, root } = repo;
+    writeFileSync(join(root, '.git', 'info', 'exclude'), 'node_modules/\n');
+    const prs = [];
+    const paths = {};
+
+    // The decks case: PR merged, new untracked file in the worktree.
+    prs.push(pr('feat/merged-dirty', branch(root, 'feat/merged-dirty')));
+    paths.mergedDirty = worktree(repo, 'feat/merged-dirty');
+    writeFileSync(join(paths.mergedDirty, 'slide-11.txt'), 'layout\n');
+    // PR merged, a commit past its head and a tracked file modified.
+    const aheadHead = branch(root, 'feat/ahead-dirty');
+    prs.push(pr('feat/ahead-dirty', aheadHead));
+    branch(root, 'feat/ahead-dirty', aheadHead);
+    paths.aheadDirty = worktree(repo, 'feat/ahead-dirty');
+    writeFileSync(join(paths.aheadDirty, 'README'), 'fixture\nedited\n');
+    // No PR, stale once `now` is LATER, tracked file modified.
+    branch(root, 'feat/stale-dirty');
+    paths.staleDirty = worktree(repo, 'feat/stale-dirty');
+    writeFileSync(join(paths.staleDirty, 'README'), 'fixture\nwork in progress\n');
+    paths.detachedDirty = join(base, 'wt-detached-dirty');
+    git(root, 'worktree', 'add', '-q', '--detach', paths.detachedDirty, 'main');
+    writeFileSync(join(paths.detachedDirty, 'result.txt'), 'benchmark\n');
+
+    prs.push(pr('feat/merged-clean', branch(root, 'feat/merged-clean')));
+    paths.mergedClean = worktree(repo, 'feat/merged-clean');
+    execFileSync('mkdir', ['-p', join(paths.mergedClean, 'node_modules', 'x')]);
+    writeFileSync(join(paths.mergedClean, 'node_modules', 'x', 'index.js'), '\n');
+    branch(root, 'feat/stale-clean');
+    paths.staleClean = worktree(repo, 'feat/stale-clean');
+    paths.detachedClean = join(base, 'wt-detached-clean');
+    git(root, 'worktree', 'add', '-q', '--detach', paths.detachedClean, 'main');
+
+    return { paths, prs, repo };
+  }
+
+  const DIRTY = /has uncommitted changes: commit or discard them, then run prune again/;
+
+  it('dry run and --yes keep every dirty worktree, listed apart, and remove the clean ones', async () => {
+    const { paths, prs, repo } = dirtyAndClean();
+    const { root } = repo;
+    try {
+      const opts = { now: LATER, pullRequests: { defaultBranch: 'main', pullRequests: prs } };
+
+      for (const apply of [false, true]) {
+        const { lines, result, text } = await run(repo, { ...opts, apply });
+        const header = lines.findIndex((l) => /with uncommitted changes/.test(l));
+        assert.ok(header > 0, `header line present:\n${text}`);
+        const after = lines.slice(header + 1).join('\n');
+
+        for (const [name, path] of [
+          ['feat/merged-dirty', paths.mergedDirty],
+          ['feat/ahead-dirty', paths.aheadDirty],
+          ['feat/stale-dirty', paths.staleDirty],
+        ]) {
+          const line = lineFor(after, 'kept', name);
+          assert.ok(line, `${name} listed after the header:\n${text}`);
+          assert.ok(line.includes(path), `${name} line shows the path: ${line}`);
+          assert.match(line, DIRTY);
+        }
+        assert.match(lineFor(after, 'kept', paths.detachedDirty), /uncommitted changes/);
+        assert.equal(lineFor(text, apply ? 'removed' : 'would remove', 'dirty'), undefined, text);
+
+        const verb = apply ? 'removed' : 'would remove';
+        assert.ok(lineFor(text, verb, 'feat/merged-clean'), text);
+        assert.ok(lineFor(text, verb, 'feat/stale-clean'), text);
+        assert.ok(lineFor(text, verb, paths.detachedClean), text);
+        assert.equal(result.failed, 0, text);
+        assert.equal(result.removed, 3, text);
+        assert.equal(result.uncommitted, 4, text);
+        assert.match(text, /\(4 with uncommitted changes\)/);
+      }
+
+      for (const path of [paths.mergedDirty, paths.aheadDirty, paths.staleDirty]) {
+        assert.ok(existsSync(path), `${path} kept`);
+      }
+      assert.equal(readFileSync(join(paths.mergedDirty, 'slide-11.txt'), 'utf-8'), 'layout\n');
+      assert.equal(readFileSync(join(paths.detachedDirty, 'result.txt'), 'utf-8'), 'benchmark\n');
+      for (const path of [paths.mergedClean, paths.staleClean, paths.detachedClean]) {
+        assert.ok(!existsSync(path), `${path} removed`);
+      }
+      assert.deepEqual(localBranches(root), [
+        'feat/ahead-dirty',
+        'feat/merged-dirty',
+        'feat/stale-dirty',
+        'main',
+      ]);
+      const date = archiveDate(LATER);
+      assert.deepEqual(tags(root), [
+        `archive/${date}/detached/wt-detached-clean`,
+        `archive/${date}/feat/stale-clean`,
+      ]);
+    } finally {
+      rmSync(repo.base, { force: true, recursive: true });
+    }
+  });
+
+  it('the CLI exits 0 in the dry run and with --yes and keeps the dirty worktree', () => {
+    const { paths, prs, repo } = dirtyAndClean();
+    try {
+      const env = fakeGh(repo.base, prs);
+      for (const args of [['prune'], ['prune', '--yes']]) {
+        const res = cli(repo.root, args, env);
+        assert.equal(res.status, 0, `stdout: ${res.stdout}\nstderr: ${res.stderr}`);
+        const line = lineFor(res.stdout, 'kept', 'feat/merged-dirty');
+        assert.ok(line?.includes(paths.mergedDirty), res.stdout);
+        assert.match(line, DIRTY);
+      }
+      assert.ok(existsSync(join(paths.mergedDirty, 'slide-11.txt')));
+      assert.ok(!existsSync(paths.mergedClean), 'clean merged worktree removed');
     } finally {
       rmSync(repo.base, { force: true, recursive: true });
     }

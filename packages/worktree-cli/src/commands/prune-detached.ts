@@ -6,9 +6,11 @@ import {
   archiveBranch,
   type ArchiveResult,
   archiveTag,
+  COMMIT_OR_DISCARD,
   DEFAULT_STALE_DAYS,
   describeArchive,
   detachedActivity,
+  hasUncommittedChanges,
   idleDays,
   isStale,
   readStatus,
@@ -16,8 +18,13 @@ import {
 } from './prune-stale.js';
 
 export type DetachedDecision =
-  | { action: 'ignore' | 'keep'; reason: string }
-  | { action: 'remove'; dirty: boolean; reason: string };
+  | {
+      action: 'ignore' | 'keep';
+      reason: string;
+      /** Kept only because the worktree has uncommitted changes. */
+      uncommitted?: true;
+    }
+  | { action: 'remove'; reason: string };
 
 export interface ClassifyDetachedInput {
   cwdWorktree?: string;
@@ -31,7 +38,8 @@ export interface ClassifyDetachedInput {
 
 /**
  * Decide what prune does with a worktree on a detached HEAD. It has no branch
- * and so no PR to go by: it goes, archived, once idle longer than staleDays.
+ * and so no PR to go by: it goes, archived, once idle longer than staleDays,
+ * unless it has uncommitted changes.
  */
 export function classifyDetached(input: ClassifyDetachedInput): DetachedDecision {
   const { now, path } = input;
@@ -41,9 +49,16 @@ export function classifyDetached(input: ClassifyDetachedInput): DetachedDecision
   }
   const status = input.readStatus(path);
   if (status === null) return { action: 'keep', reason: `the status of ${path} can't be read` };
+  if (hasUncommittedChanges(status)) {
+    return {
+      action: 'keep',
+      reason: `uncommitted changes: ${COMMIT_OR_DISCARD}`,
+      uncommitted: true,
+    };
+  }
   const idle = idleDays(now, input.lastActivity);
   if (isStale(now, input.lastActivity, staleDays)) {
-    return { action: 'remove', dirty: status.trim() !== '', reason: `idle ${idle}d` };
+    return { action: 'remove', reason: `idle ${idle}d` };
   }
   return {
     action: 'ignore',
@@ -53,7 +68,6 @@ export function classifyDetached(input: ClassifyDetachedInput): DetachedDecision
 
 export interface DetachedContext {
   apply: boolean;
-  archiveDir: string;
   cwdWorktree: string;
   date: string;
   git: (args: string[]) => string;
@@ -61,6 +75,8 @@ export interface DetachedContext {
   out: (line: string) => void;
   result: PruneResult;
   staleDays: number;
+  /** Receives the `kept` line of a worktree with uncommitted changes, printed apart. */
+  uncommittedLines: string[];
   wt: WorktreeEntry;
 }
 
@@ -83,30 +99,30 @@ export function pruneDetached(ctx: DetachedContext): void {
   });
   const what = `detached ${wt.path} (HEAD ${head.slice(0, 7)}, ${decision.reason})`;
   if (decision.action !== 'remove') {
-    out(`${pad(decision.action === 'keep' ? 'kept' : 'ignored')}${what}`);
+    const line = `${pad(decision.action === 'keep' ? 'kept' : 'ignored')}${what}`;
+    if (decision.uncommitted) {
+      ctx.uncommittedLines.push(line);
+      result.uncommitted++;
+    } else out(line);
     result.kept++;
     return;
   }
 
   const name = `detached/${basename(wt.path)}`;
   if (!ctx.apply) {
-    const extra = decision.dirty ? ' plus the uncommitted changes' : '';
-    out(`${pad('would remove')}${what}; archives as ${archiveTag(ctx.date, name)}${extra}`);
+    out(`${pad('would remove')}${what}; archives as ${archiveTag(ctx.date, name)}`);
     result.removed++;
     return;
   }
   let archived: ArchiveResult;
   try {
     archived = archiveBranch({
-      archiveDir: ctx.archiveDir,
       branch: name,
       date: ctx.date,
-      dirty: decision.dirty,
       git: ctx.git,
       reason: decision.reason,
       subject: `Worktree destacado ${wt.path} arquivado`,
       tip: head,
-      worktree: wt.path,
     });
   } catch (e) {
     out(`${pad('FAILED')}${what}: archiving failed, nothing was deleted (${firstLine(e)})`);
@@ -114,7 +130,8 @@ export function pruneDetached(ctx: DetachedContext): void {
     return;
   }
   try {
-    ctx.git(['worktree', 'remove', '--force', wt.path]);
+    // No --force: git refuses a worktree that got changes after it was classified.
+    ctx.git(['worktree', 'remove', wt.path]);
   } catch (e) {
     out(`${pad('FAILED')}${what}: not removed (${firstLine(e)}); ${describeArchive(archived)}`);
     result.failed++;

@@ -629,13 +629,13 @@ platform, 58 in lattes-editor). Close that gap without being asked:
   then apply.
 - `precisa-worktree prune` removes a merged PR's branch right away when
   its local tip is the PR head or behind it. A merged branch with commits
-  past the PR head, or with uncommitted changes, is archived and removed
-  after one idle day. Everything else (closed PRs, branches without a PR,
-  detached worktrees) goes after `staleDays` idle (7 by default). Open
-  PRs, the current worktree and `park/*` branches always stay. Archiving
-  means a tag `archive/<date>/<branch>` at the tip plus a patch of
-  uncommitted work under `~/.local/share/precisa-worktree/archive/`, so
-  nothing is lost. To keep a branch without a PR, name it `park/...`.
+  past the PR head is archived and removed after one idle day. Everything
+  else (closed PRs, branches without a PR, detached worktrees) goes after
+  `staleDays` idle (7 by default). Open PRs, the current worktree, `park/*`
+  branches and any worktree with uncommitted changes always stay; the
+  dirty ones are listed apart at the end of the output. Archiving means a
+  tag `archive/<date>/<branch>` at the tip. To keep a branch without a PR,
+  name it `park/...`.
 - Read the whole prune output, not only the `removed` lines. A `kept` or
   `FAILED` line says why something stayed; filtering with
   `grep removed` is how leftovers went unnoticed for days.

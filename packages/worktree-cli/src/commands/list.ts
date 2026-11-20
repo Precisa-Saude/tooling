@@ -1,9 +1,11 @@
+/* eslint-disable no-console -- CLI de list: imprime a tabela de worktrees no console de propósito */
 import { existsSync } from 'node:fs';
 
-import { type ServiceConfig, type WorktreeConfig } from '../config.js';
-import { worktreePath } from '../paths.js';
+import { hasServices, type ServiceConfig, type WorktreeConfig } from '../config.js';
+import { parseWorktreeList, worktreePath } from '../paths.js';
 import { isPortInUse } from '../ports.js';
 import { readRegistry } from '../registry.js';
+import { run } from './prune-stale.js';
 
 export interface ListOptions {
   cfg: WorktreeConfig;
@@ -11,6 +13,11 @@ export interface ListOptions {
 }
 
 export async function list({ cfg, repoRoot }: ListOptions): Promise<void> {
+  if (!hasServices(cfg)) {
+    listWithoutServices(cfg, repoRoot);
+    return;
+  }
+
   const reg = await readRegistry(cfg);
 
   console.log(`Worktrees for ${cfg.directoryPrefix}:`);
@@ -51,6 +58,25 @@ export async function list({ cfg, repoRoot }: ListOptions): Promise<void> {
 
   console.log('');
   console.log(`Registry: ${cfg.portRegistry}`);
+}
+
+/**
+ * With `services: []` nothing is in the port registry, so the worktrees come
+ * from `git worktree list`, main checkout first.
+ */
+function listWithoutServices(cfg: WorktreeConfig, repoRoot: string): void {
+  const worktrees = parseWorktreeList(
+    run('git', ['-C', repoRoot, 'worktree', 'list', '--porcelain']),
+  );
+  console.log(`Worktrees for ${cfg.directoryPrefix} (no dev servers, no ports):`);
+  console.log('');
+  const widths = [40, 10];
+  printRow(['BRANCH', 'PATH'], widths);
+  printRow(['------', '----'], widths);
+  for (const wt of worktrees) {
+    const branch = wt.branch ?? '(detached)';
+    printRow([branch, wt.prunable ? `${wt.path} (missing)` : wt.path], widths);
+  }
 }
 
 function statusOf(
